@@ -2,11 +2,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class RobotLogistico implements Ubicable {
-    private int id;
+    private final int id;
     private Coordenada ubicacion;
-    private int bateriaMaxima;
+    private final int bateriaMaxima;
     private int bateriaActual;  // Cambiado a entero simple
-    private int capacidadPedidosTraslado;
+    private final int capacidadPedidosTraslado;
     private Estado estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
 
@@ -60,13 +60,13 @@ public class RobotLogistico implements Ubicable {
     }
 
     // Métodos para manejar la carga (ítems)
-    public boolean puedeCargar(Item item, int cantidad) {
+    public boolean puedeCargar(int cantidad) {
         int cargaTotal = cargaActual.values().stream().mapToInt(Integer::intValue).sum();
         return cargaTotal + cantidad <= capacidadPedidosTraslado;
     }
 
     public void agregarCarga(Item item, int cantidad) {
-        if (!puedeCargar(item, cantidad)) {
+        if (!puedeCargar(cantidad)) {
             throw new IllegalStateException("Capacidad de carga excedida");
         }
         cargaActual.merge(item, cantidad, Integer::sum);

@@ -1,4 +1,4 @@
 public interface Ubicable {
-    public Coordenada obtenerUbicacion();
-    public void moverA(Coordenada ubicacion);
+    Coordenada obtenerUbicacion();
+    void moverA(Coordenada ubicacion);
 }
