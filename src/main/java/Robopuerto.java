@@ -55,7 +55,9 @@ public class Robopuerto {
     }
 
     public void registrarRobot(RobotLogistico robot) {
-        robotsAsociados.add(robot);
+        if(!robotsAsociados.contains(robot)) {
+            robotsAsociados.add(robot);
+        }
     }
 
     public void recargarRobot(RobotLogistico robot) { // Podríamos hacer un exception acá como: RecargaNoPermitidaException?
