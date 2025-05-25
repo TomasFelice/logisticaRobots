@@ -56,7 +56,9 @@ public class Robopuerto {
     //Manejo de robots:
 
     public void registrarRobot(RobotLogistico robot) {
-        robotsAsociados.add(robot);
+        if(!robotsAsociados.contains(robot)) {
+            robotsAsociados.add(robot);
+        }
     }
 
     private int validarTasaRecarga(int tasaRecarga) {
