@@ -16,7 +16,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
 
-    public RobotLogistico(int id, Coordenada ubicacion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
+    public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
         this.posicion = requireNonNull(posicion, "Posición no puede ser null");
         this.robopuertoBase = requireNonNull(robopuertoBase); // de algún lado tiene que salir
