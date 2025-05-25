@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import static java.util.Objects.requireNonNull;
+
 public class RobotLogistico /*implements Ubicable*/ {
     private final int id;
     private Punto posicion;
@@ -14,10 +16,10 @@ public class RobotLogistico /*implements Ubicable*/ {
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
 
-    public RobotLogistico(int id, Coordenada ubicacion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
+    public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
-        this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
-        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que salir
+        this.posicion = requireNonNull(posicion, "Posición no puede ser null");
+        this.robopuertoBase = requireNonNull(robopuertoBase); // de algún lado tiene que salir
         this.bateriaMaxima = validarBateria(bateriaMaxima);
         this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
         this.capacidadPedidosTraslado = validarCapacidadDeTraslado(capacidadPedidosTraslado);
@@ -53,7 +55,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
-        Objects.requireNonNull(nuevoEstado, "El nuevo estado no puede ser nulo");
+        requireNonNull(nuevoEstado, "El nuevo estado no puede ser nulo");
 
         if (!validarTransicion(this.estado, nuevoEstado)) {
             throw new IllegalStateException(
@@ -175,6 +177,17 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     public void descargarCarga(Item item, int cantidad) { //para despachar en Cofres - pendiente
-
+        if (cantidad <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser positiva");
+        }
+        Integer cantidadActual = cargaActual.get(item);
+        if (cantidadActual == null || cantidadActual < cantidad) {
+            throw new IllegalStateException("No hay suficiente cantidad del ítem para descargar");
+        }
+        if(cantidadActual == cantidad){
+            cargaActual.remove(item);
+        }else{
+            cargaActual.put(item, cantidadActual - cantidad);
+        }
     }
 }
