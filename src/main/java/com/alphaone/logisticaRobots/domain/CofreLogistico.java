@@ -111,4 +111,7 @@ public abstract class CofreLogistico {
                 id, posicion, inventario.getTotalItems(), capacidadMaxima);
     }
 
+    public Map<Item, Integer> obtenerItemsDisponibles() {
+        return inventario.getItemsDelInventario();
+    }
 }

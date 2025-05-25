@@ -10,8 +10,8 @@ public class Robopuerto {
     private final Punto posicion;
     private final double distanciaMaxima;
     private final int tasaRecarga;  // Cantidad de células que recarga por ciclo
-    private final List<CofreLogistico> cofresConectados;
     private final List<RobotLogistico> robotsAsociados;
+    private final List<CofreLogistico> cofresConectados;
 
     public Robopuerto(int id, Punto posicion, double distanciaMaxima, int tasaRecarga) {
         this.id = id;
@@ -22,6 +22,8 @@ public class Robopuerto {
         this.robotsAsociados = new ArrayList<>();
     }
 
+    //INICIO - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia
+
     private double validarDistancia(double distancia) {
         if (distancia <= 0) {
             throw new IllegalArgumentException("La distancia máxima debe ser positiva");
@@ -29,16 +31,13 @@ public class Robopuerto {
         return distancia;
     }
 
-    private int validarTasaRecarga(int tasaRecarga) {
-        if (tasaRecarga <= 0) {
-            throw new IllegalArgumentException("La distancia debe ser positiva");
-        }
-        return tasaRecarga;
-    }
-
     public boolean estaEnCobertura(Punto otraUbicacion) {
         return posicion.distanciaHacia(otraUbicacion) <= distanciaMaxima;
     }
+
+    //FIN - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia
+
+    // Manejo de Cofres:
 
     public void conectarCofre(CofreLogistico cofre) {
         if (estaEnCobertura(cofre.getPosicion())) {
@@ -54,8 +53,17 @@ public class Robopuerto {
         }
     }
 
+    //Manejo de robots:
+
     public void registrarRobot(RobotLogistico robot) {
         robotsAsociados.add(robot);
+    }
+
+    private int validarTasaRecarga(int tasaRecarga) {
+        if (tasaRecarga <= 0) {
+            throw new IllegalArgumentException("La distancia debe ser positiva");
+        }
+        return tasaRecarga;
     }
 
     public void recargarRobot(RobotLogistico robot) { // Podríamos hacer un exception acá como: RecargaNoPermitidaException?

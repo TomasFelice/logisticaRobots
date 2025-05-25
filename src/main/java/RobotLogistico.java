@@ -1,29 +1,33 @@
+import com.alphaone.logisticaRobots.domain.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.Item;
 import com.alphaone.logisticaRobots.domain.Punto;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public class RobotLogistico /*implements Ubicable*/ {
     private final int id;
     private Punto posicion;
-    private final Robopuerto robopuertoBase; // esto a validar
     private final int bateriaMaxima;
     private int bateriaActual;  // Cambiado a entero simple
     private final int capacidadPedidosTraslado;
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
+    private final Robopuerto robopuertoBase; // el robot empieza en un nodo del camino y puede desplazarse a otro en base a los nodos, sus pesos y cantidad de robots que se tenga
+    private Queue<Pedido> pedidosEncolados; // debe tener una cola de pedidos
 
-    public RobotLogistico(int id, Coordenada ubicacion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
+    public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
         this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
-        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que salir
         this.bateriaMaxima = validarBateria(bateriaMaxima);
         this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
         this.capacidadPedidosTraslado = validarCapacidadDeTraslado(capacidadPedidosTraslado);
         this.estado = EstadoRobot.ACTIVO; // Estado inicial
-        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE
+        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
+        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que salir
+        this.pedidosEncolados = new LinkedList<>();
     }
+
+    //Getters:
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
@@ -32,6 +36,7 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     // Métodos para manejar los estados del robot
 
+    /*
     public void iniciarMision() {
         cambiarEstado(EstadoRobot.EN_MISION);
     }
@@ -51,6 +56,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     public void desactivar() {
         cambiarEstado(EstadoRobot.INACTIVO);
     }
+    esto tal vez se saque ya que para eso hice la clase "cambiarEstado"*/
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
         Objects.requireNonNull(nuevoEstado, "El nuevo estado no puede ser nulo");
@@ -101,10 +107,6 @@ public class RobotLogistico /*implements Ubicable*/ {
         System.out.println("Estado cambiado a: " + this.estado);
     }
 
-    public boolean estaEnEstado(EstadoRobot estado) {
-        return this.estado == estado; // Uso de == para comparaciones
-    }
-
     // Métodos para manejar la batería
 
     private int validarBateria(int bateria) {
@@ -119,16 +121,13 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     public void consumirBateria(int cantidad) {
-        if (cantidad > bateriaActual && estado != EstadoRobot.INACTIVO) {
+        if (tieneSuficienteBateria(cantidad) && estado != EstadoRobot.INACTIVO) {
             throw new IllegalStateException("No hay suficiente batería");
         }
         bateriaActual -= cantidad;
     }
 
-    public void recargarBateria(int cantidad) {
-        if (cantidad <= 0) {
-            throw new IllegalArgumentException("La cantidad a recargar debe ser positiva");
-        }
+    public void recargarBateria(int cantidad) { //la bateria la recarga el robopuerto, pero para manejo de bateria en la propia clase, se hace acá
         if (this.bateriaActual + cantidad > this.bateriaMaxima) {
             throw new IllegalStateException("No se puede exceder la capacidad máxima de la batería");
         }
@@ -167,14 +166,43 @@ public class RobotLogistico /*implements Ubicable*/ {
         return cargaTotal + cantidad <= capacidadPedidosTraslado;
     }
 
-    public void agregarCarga(Item item, int cantidad) {
-        if (!puedeCargar(cantidad)) {
-            throw new IllegalStateException("Capacidad de carga excedida");
-        }
-        cargaActual.merge(item, cantidad, Integer::sum);
+
+    private void cargarDesdeCofre(CofreLogistico cofre) {
+
+        if(this.pedidosEncolados.isEmpty() || cofre == null) { throw new IllegalArgumentException("No se puede cargar desde Cofre"); }
+
+        Map<Item, Integer> items = cofre.obtenerItemsDisponibles();
+
+        //por cada pedido tomado, tengo que preguntar si dentro de ese pedido consultado, se encuentra el cofre del cual obtener productos y empezar a cargar "CargaActual"
+
+        /*for(pedidosEncolados ){
+
+            if(pedidosEncolados.getCofre)
+            //por cada pedido encolado
+            for (Map.Entry<Item, Integer> entry : items.entrySet()) {
+                int cantidadDisponible = entry.getValue();
+                int capacidadRestante = capacidadPedidosTraslado - cargaActual.values().stream().mapToInt(Integer::intValue).sum(); //acá deberíamos tener lo mismo que inventarios, no?
+                int cantidadATomar = Math.min(cantidadDisponible, capacidadRestante);
+
+                if (cantidadATomar > 0) {
+                    cofre.retirarItems(entry.getKey(), cantidadATomar);
+                    cargaActual.merge(entry.getKey(), cantidadATomar, Integer::sum);
+                }
+            }
+        }*/
     }
 
-    public void descargarCarga(Item item, int cantidad) { //para despachar en Cofres - pendiente
-
+    private void descargarEnCofre(CofreLogistico cofre) {
+//        for (Map.Entry<Item, Integer> entry : cargaActual.entrySet()) {
+//            int cantidadRequerida = cofre.getCantidadRequerida(entry.getKey());
+//            int cantidadADescargar = Math.min(entry.getValue(), cantidadRequerida);
+//
+//            if (cantidadADescargar > 0) {
+//                cofre.recibirItems(entry.getKey(), cantidadADescargar);
+//                cargaActual.merge(entry.getKey(), -cantidadADescargar, Integer::sum);
+//            }
+//        }
+//        cargaActual.values().removeIf(val -> val <= 0);
     }
+
 }

@@ -53,6 +53,8 @@ public class Inventario {
         return items.values().stream().mapToInt(Integer::intValue).sum();
     }
 
+    public Map<Item, Integer> getItemsDelInventario() {return items;}
+
     @Override
     public String toString() {
         return "Inventario{items=" + items + "}";
