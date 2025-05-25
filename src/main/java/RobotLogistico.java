@@ -1,7 +1,14 @@
 import com.alphaone.logisticaRobots.domain.Punto;
+import com.alphaone.logisticaRobots.domain.Pedido;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.List;
+import java.util.ArrayList;
+
+
 import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
@@ -15,6 +22,10 @@ public class RobotLogistico /*implements Ubicable*/ {
     private final int capacidadPedidosTraslado;
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
+    private final Queue<Pedido> pedidosPendientes = new LinkedList<>();
+    private final List<Pedido> historialPedidos = new ArrayList<>();
+
+    private Pedido pedidoActual;
 
     public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
@@ -31,6 +42,8 @@ public class RobotLogistico /*implements Ubicable*/ {
     public int getBateriaMaxima() {return bateriaMaxima;}
     public Punto getPosicion() {return posicion;}
     public EstadoRobot getEstado() {return estado;}
+    public List<Pedido> getHistorialPedidos() { return historialPedidos; }
+    public Queue<Pedido> getPedidosPendientes() { return pedidosPendientes; }
 
     // Métodos para manejar los estados del robot
 
@@ -52,6 +65,17 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     public void desactivar() {
         cambiarEstado(EstadoRobot.INACTIVO);
+    }
+
+    public void agregarPedido(Pedido pedido) {
+        if (pedido == null) throw new IllegalArgumentException("El pedido no puede ser null");
+        pedidosPendientes.add(pedido);
+    }
+
+    private void finalizarPedido() {
+        historialPedidos.add(pedidoActual);
+        pedidoActual = null;
+        activar();
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
