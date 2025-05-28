@@ -8,7 +8,6 @@ public class Pedido {
     private CofreLogistico origen;
     private CofreLogistico destino;
     private Map<Item,Integer> itemsPedido; //representaría la cantidad y el item que se tiene como
-    //private Ruta rutaOptima;
 
     public Pedido(int id, CofreLogistico origen, CofreLogistico destino) {
         this.id = id;

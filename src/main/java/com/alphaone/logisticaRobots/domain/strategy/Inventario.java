@@ -55,6 +55,7 @@ public class Inventario {
 
     public Map<Item, Integer> getItemsDelInventario() {return items;}
 
+
     @Override
     public String toString() {
         return "Inventario{items=" + items + "}";

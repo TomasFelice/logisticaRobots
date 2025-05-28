@@ -55,9 +55,15 @@ public class Robopuerto {
 
     //Manejo de robots:
 
-    public void registrarRobot(RobotLogistico robot) {
+    public void conectarRobot(RobotLogistico robot) {
         if(!robotsAsociados.contains(robot)) {
             robotsAsociados.add(robot);
+        }
+    }
+
+    public void desconectarRobot(RobotLogistico robot) {
+        if (robotsAsociados.contains(robot)) {
+            robotsAsociados.remove(robot);
         }
     }
 
