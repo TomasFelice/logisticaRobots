@@ -1,4 +1,5 @@
-import com.alphaone.logisticaRobots.domain.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.pathfinding.GrillaEspacial;
+import com.alphaone.logisticaRobots.domain.strategy.Pedido;
 
 import java.util.Map;
 
@@ -6,7 +7,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
 
     private final Map<Integer, Robopuerto> robopuertos; //el robopuerto dentro va a contener a los robots y los cofres
     private final Planificador planificador; // el que va a implementar dijkstra y las planificaciones
-    private final Map<Integer,Pedido> pedidos;
+    private final Map<Integer, Pedido> pedidos;
     private final Map<Integer, GrillaEspacial> grillasEspaciales;
 
 
@@ -24,4 +25,8 @@ public class RedLogistica { // es el universo donde se componen las cosas
     public void agregarPedido(Pedido pedido) {
 
     }
+
+//    public Robopuerto getRobopuertos() {
+//        return robopuertos; //
+//    }
 }

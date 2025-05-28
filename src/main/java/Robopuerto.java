@@ -1,5 +1,5 @@
-import com.alphaone.logisticaRobots.domain.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.Punto;
+import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 
 import java.util.ArrayList;
 import java.util.List;

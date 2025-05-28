@@ -1,7 +1,7 @@
 package com.alphaone.logisticaRobots.domain.comportamiento;
 
-import com.alphaone.logisticaRobots.domain.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.Item;
+import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.strategy.Item;
 
 /**
  * Interfaz para los diferentes comportamientos de los cofres (Strategy)

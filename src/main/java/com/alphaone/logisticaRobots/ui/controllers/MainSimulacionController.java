@@ -440,7 +440,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 robot.itemsEnCarga().forEach((item, cant) -> sb.append("  - ").append(item).append(": ").append(cant).append("\n"));
                 sb.append("Estado: ").append(robot.estadoActual()).append("\n");
                 if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
-                    sb.append("Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
+                    sb.append("com.alphaone.logisticaRobots.domain.pathfinding.Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
                 }
                 break;
             case "COFRE":

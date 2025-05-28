@@ -1,4 +1,4 @@
-package com.alphaone.logisticaRobots.domain;
+package com.alphaone.logisticaRobots.domain.strategy;
 
 import java.util.HashMap;
 import java.util.Map;
