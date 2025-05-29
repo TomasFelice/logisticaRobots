@@ -48,7 +48,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
     // --- Dependencias ---
     private ServicioSimulacion servicioSimulacion; // Se inyectará o instanciará
 
-    // --- Estado del controlador ---
+    // --- com.alphaone.logisticaRobots.domain.Estado del controlador ---
     private DimensionGrillaDTO dimensionGrilla;
     private List<RobotDTO> ultimosRobots;
     private List<CofreDTO> ultimosCofres;
@@ -94,7 +94,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         // Inicialmente, no hay detalles para mostrar
         textAreaDetallesEntidad.setText("Seleccione una entidad en la grilla para ver sus detalles.");
         labelCicloActual.setText("Ciclo: N/A");
-        labelEstadoSimulacion.setText("Estado: No iniciado");
+        labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: No iniciado");
     }
 
     /**
@@ -205,7 +205,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 // Podría ser un estado inicial antes de cargar config
                 limpiarCanvas();
                 labelCicloActual.setText("Ciclo: N/A");
-                labelEstadoSimulacion.setText("Estado: Esperando configuración");
+                labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: Esperando configuración");
                 this.dimensionGrilla = null;
                 this.ultimosRobots = null;
                 this.ultimosCofres = null;
@@ -226,7 +226,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             dibujarEstado(nuevoEstado);
 
             labelCicloActual.setText("Ciclo: " + nuevoEstado.cicloActual());
-            labelEstadoSimulacion.setText("Estado: " + nuevoEstado.estadoGeneral());
+            labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: " + nuevoEstado.estadoGeneral());
 
             // Actualizar estado de botones según el estado de la simulación
             // Por ejemplo, si la simulación está "CORRIENDO", "PAUSADA", "FINALIZADA"
@@ -251,7 +251,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                     botonAvanzarCiclo.setDisable(false); // Permitir avanzar si está finalizada o error podría ser opcional
                     break;
                 default:
-                    // Estado desconocido o inicial antes de cargar config
+                    // com.alphaone.logisticaRobots.domain.Estado desconocido o inicial antes de cargar config
                     if (servicioSimulacion != null && dimensionGrilla != null) { // Si hay una config cargada
                         botonIniciar.setDisable(false);
                         botonPausar.setDisable(true);
@@ -595,7 +595,7 @@ private void dibujarRobot(RobotDTO robot) {
                 sb.append("Carga: ").append(robot.cargaActual()).append(" / ").append(robot.capacidadCarga()).append("\n");
                 sb.append("Items en carga: \n");
                 robot.itemsEnCarga().forEach((item, cant) -> sb.append("  - ").append(item).append(": ").append(cant).append("\n"));
-                sb.append("Estado: ").append(robot.estadoActual()).append("\n");
+                sb.append("com.alphaone.logisticaRobots.domain.Estado: ").append(robot.estadoActual()).append("\n");
                 if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
                     sb.append("com.alphaone.logisticaRobots.domain.pathfinding.Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
                 }

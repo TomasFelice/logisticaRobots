@@ -1,3 +1,5 @@
+package com.alphaone.logisticaRobots.domain;
+
 import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
 import com.alphaone.logisticaRobots.domain.strategy.Inventario;
 import com.alphaone.logisticaRobots.domain.strategy.Item;
@@ -16,8 +18,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando y su cantidad
     private final Robopuerto robopuertoBase; // el robot empieza en un nodo del camino y puede desplazarse a otro en base a los nodos, sus pesos y cantidad de robots que se tenga
-    private Queue<Pedido> pedidosEncolados; // debe tener una cola de pedidos
-    private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
+    private Queue<Pedido> pedidosEncolados; // debe tener una cola de pedidos [TODO] Cambiar por cola de prioridad
     private final Queue<Pedido> pedidosPendientes = new LinkedList<>();
     private final List<Pedido> historialPedidos = new ArrayList<>();
 
@@ -28,7 +29,7 @@ public class RobotLogistico /*implements Ubicable*/ {
         this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
         this.bateriaMaxima = validarBateria(bateriaMaxima);
         this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
-        this.estado = EstadoRobot.ACTIVO; // Estado inicial
+        this.estado = EstadoRobot.ACTIVO; // com.alphaone.logisticaRobots.domain.Estado inicial
         this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
         this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
         this.pedidosEncolados = new LinkedList<>();
@@ -47,23 +48,23 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     /*
     public void iniciarMision() {
-        cambiarEstado(EstadoRobot.EN_MISION);
+        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.EN_MISION);
     }
 
     public void ponerEnEspera() {
-        cambiarEstado(EstadoRobot.PASIVO);
+        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.PASIVO);
     }
 
     public void iniciarRecarga() {
-        cambiarEstado(EstadoRobot.CARGANDO);
+        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.CARGANDO);
     }
 
     public void activar() {
-        cambiarEstado(EstadoRobot.ACTIVO);
+        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.ACTIVO);
     }
 
     public void desactivar() {
-        cambiarEstado(EstadoRobot.INACTIVO);
+        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.INACTIVO);
     }
     esto tal vez se saque ya que para eso hice la clase "cambiarEstado"*/
     public void agregarPedido(Pedido pedido) {
@@ -74,7 +75,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     private void finalizarPedido() {
         historialPedidos.add(pedidoActual);
         pedidoActual = null;
-        activar();
+        cambiarEstado(EstadoRobot.ACTIVO);
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
@@ -123,7 +124,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     private void registrarCambioEstado() {
-        System.out.println("Estado cambiado a: " + this.estado);
+        System.out.println("com.alphaone.logisticaRobots.domain.Estado cambiado a: " + this.estado);
     }
 
     public boolean estaEnEstado(EstadoRobot estado) {

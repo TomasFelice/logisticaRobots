@@ -1,3 +1,5 @@
+package com.alphaone.logisticaRobots.domain;
+
 public abstract class Estado { // me parece que el módelo state no va. Podríamos usar un enum por cada estado para que sea mucho más sencillo
 
     protected String nombre;

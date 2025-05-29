@@ -1,3 +1,5 @@
+package com.alphaone.logisticaRobots.domain;
+
 public enum EstadoRobot {
     ACTIVO,      // Robot operativo y listo para recibir órdenes
     PASIVO,      // Robot en espera pero operativo -

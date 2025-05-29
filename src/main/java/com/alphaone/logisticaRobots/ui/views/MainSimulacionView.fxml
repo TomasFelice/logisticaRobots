@@ -46,7 +46,7 @@
                 <Separator orientation="VERTICAL"/>
                 <Label fx:id="labelCicloActual" text="Ciclo: N/A"/>
                 <Separator orientation="VERTICAL"/>
-                <Label fx:id="labelEstadoSimulacion" text="Estado: No iniciado"/>
+                <Label fx:id="labelEstadoSimulacion" text="com.alphaone.logisticaRobots.domain.Estado: No iniciado"/>
             </HBox>
             
             <Separator/>
@@ -86,7 +86,7 @@
             
             <HBox spacing="5" alignment="CENTER_LEFT">
                 <Rectangle width="12" height="12" fill="DARKBLUE"/>
-                <Label text="Robopuerto"/>
+                <Label text="com.alphaone.logisticaRobots.domain.Robopuerto"/>
                 <Rectangle width="12" height="12" fill="BROWN"/>
                 <Label text="Cofre (Accesible)"/>
                 <Rectangle width="12" height="12" fill="GRAY"/>

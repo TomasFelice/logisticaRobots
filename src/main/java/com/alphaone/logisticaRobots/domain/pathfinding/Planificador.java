@@ -1,8 +1,4 @@
-import com.alphaone.logisticaRobots.domain.pathfinding.*;
-import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.strategy.Pedido;
-
-import java.util.*;
+package com.alphaone.logisticaRobots.domain.pathfinding;
 
 public class Planificador { //lo está haciendo tomi
     //private Grafo grafo; //tiene un mapa
@@ -15,7 +11,7 @@ public class Planificador { //lo está haciendo tomi
 //    private void construirGrafo() {
 //        this.grafo = new Grafo();
 //        // Agregar robopuertos como nodos
-//        for (Robopuerto robopuerto : redLogistica.getRobopuertos()) {
+//        for (com.alphaone.logisticaRobots.domain.Robopuerto robopuerto : redLogistica.getRobopuertos()) {
 //            grafo.agregarNodo(new Nodo(robopuerto));
 //        }
 //

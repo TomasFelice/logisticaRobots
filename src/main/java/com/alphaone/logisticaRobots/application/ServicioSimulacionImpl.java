@@ -1,6 +1,8 @@
 package com.alphaone.logisticaRobots.application;
 
 import com.alphaone.logisticaRobots.application.dto.*;
+import com.alphaone.logisticaRobots.domain.Robopuerto;
+import com.alphaone.logisticaRobots.domain.RobotLogistico;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
 import com.alphaone.logisticaRobots.domain.strategy.Item;
@@ -22,14 +24,14 @@ import java.util.concurrent.TimeUnit;
 public class ServicioSimulacionImpl implements ServicioSimulacion {
     private static final Logger logger = LoggerFactory.getLogger(ServicioSimulacionImpl.class);
     
-    // Sistema del dominio [TODO] -> Hay que pasar RedLogistica a Domain
+    // Sistema del dominio [TODO] -> Hay que pasar com.alphaone.logisticaRobots.domain.RedLogistica a Domain
     private RedLogistica redLogistica;
     
     // Configuración
     private File archivoConfigActual;
     private int velocidadSimulacion = 1000; // milisegundos entre ciclos
     
-    // Estado de la simulación
+    // com.alphaone.logisticaRobots.domain.Estado de la simulación
     private boolean enEjecucion = false;
     private int cicloActual = 0;
     private String estadoGeneral = "NO_INICIADO";
@@ -146,7 +148,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     
     // Implementación real del ciclo
     private void ejecutarCicloSimulacion() {
-        // Aquí iría la llamada al metodo simularCiclo() de RedLogistica
+        // Aquí iría la llamada al metodo simularCiclo() de com.alphaone.logisticaRobots.domain.RedLogistica
         redLogistica.simularCiclo();
         
         cicloActual++;

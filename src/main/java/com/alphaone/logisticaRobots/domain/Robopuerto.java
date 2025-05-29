@@ -1,3 +1,5 @@
+package com.alphaone.logisticaRobots.domain;
+
 import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 
@@ -84,7 +86,7 @@ public class Robopuerto {
         }
 
         if (!robot.estadoValidoDeRecarga(robot.getEstado())) {
-            throw new IllegalStateException("El robot no está en un estado válido para recargar. Estado actual: "
+            throw new IllegalStateException("El robot no está en un estado válido para recargar. com.alphaone.logisticaRobots.domain.Estado actual: "
                     + robot.getEstado());
         }
 

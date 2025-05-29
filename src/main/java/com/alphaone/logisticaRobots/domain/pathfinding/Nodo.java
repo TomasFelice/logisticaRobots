@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Nodo {
-    private Punto nodo; // Puede ser Cofre o Robopuerto
+    private Punto nodo; // Puede ser Cofre o com.alphaone.logisticaRobots.domain.Robopuerto
     private List<Arista> aristas;
 
     public Nodo(Punto elemento) {
