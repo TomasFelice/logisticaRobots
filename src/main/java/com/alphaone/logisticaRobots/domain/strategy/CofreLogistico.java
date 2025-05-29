@@ -1,6 +1,7 @@
-package com.alphaone.logisticaRobots.domain;
+package com.alphaone.logisticaRobots.domain.strategy;
 
 import com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre;
+import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -111,4 +112,7 @@ public abstract class CofreLogistico {
                 id, posicion, inventario.getTotalItems(), capacidadMaxima);
     }
 
+    public Map<Item, Integer> obtenerItemsDisponibles() {
+        return inventario.getItemsDelInventario();
+    }
 }

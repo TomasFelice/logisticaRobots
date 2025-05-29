@@ -17,6 +17,11 @@ import javafx.stage.FileChooser;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
+import javafx.scene.shape.ArcType;
+import javafx.scene.text.Font;
 
 public class MainSimulacionController implements ObservadorEstadoSimulacion {
 
@@ -291,71 +296,223 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         }
     }
 
-    private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
-        GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
-        double x = robopuerto.posicion().x() * ESCALA_DIBUJO;
-        double y = robopuerto.posicion().y() * ESCALA_DIBUJO;
-        double alcance = robopuerto.alcanceCobertura() * ESCALA_DIBUJO;
+// Reemplazar los métodos de dibujo en MainSimulacionController con estos:
 
-        // Dibujar zona de cobertura
-        gc.setFill(Color.rgb(0, 0, 255, 0.1)); // Azul claro semitransparente
-        gc.fillOval(x - alcance, y - alcance, alcance * 2, alcance * 2);
-        gc.setStroke(Color.BLUE);
-        gc.strokeOval(x - alcance, y - alcance, alcance * 2, alcance * 2);
+private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
+    GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
+    double x = robopuerto.posicion().x() * ESCALA_DIBUJO;
+    double y = robopuerto.posicion().y() * ESCALA_DIBUJO;
+    double alcance = robopuerto.alcanceCobertura() * ESCALA_DIBUJO;
 
+    // Dibujar zona de cobertura con un gradiente radial
+    gc.save();
+    RadialGradient gradient = new RadialGradient(
+            0, 0, 
+            x, y, alcance,
+            false, CycleMethod.NO_CYCLE,
+            new Stop(0, Color.rgb(100, 149, 237, 0.2)), // Azul claro en el centro
+            new Stop(1, Color.rgb(100, 149, 237, 0.05)) // Más transparente en los bordes
+    );
+    
+    gc.setFill(gradient);
+    gc.fillOval(x - alcance, y - alcance, alcance * 2, alcance * 2);
+    
+    // Borde de la zona de cobertura
+    gc.setStroke(Color.CORNFLOWERBLUE);
+    gc.setLineWidth(0.8);
+    gc.setLineDashes(5, 5);
+    gc.strokeOval(x - alcance, y - alcance, alcance * 2, alcance * 2);
+    gc.setLineDashes(null);
 
-        // Dibujar robopuerto
-        gc.setFill(Color.DARKBLUE);
-        gc.fillRect(x - TAMANO_ROBOPUERTO / 2, y - TAMANO_ROBOPUERTO / 2, TAMANO_ROBOPUERTO, TAMANO_ROBOPUERTO);
+    // Dibujar robopuerto como estructura octagonal
+    double size = TAMANO_ROBOPUERTO;
+    double s = size * 0.4; // Factor para los lados del octágono
+    
+    gc.setFill(Color.DARKBLUE);
+    double[] xPoints = {
+        x, x+s, x+size/2, x+s, x, x-s, x-size/2, x-s
+    };
+    double[] yPoints = {
+        y-size/2, y-s, y, y+s, y+size/2, y+s, y, y-s
+    };
+    gc.fillPolygon(xPoints, yPoints, 8);
+    
+    // Añadir un efecto de brillo
+    gc.setFill(Color.rgb(255, 255, 255, 0.3));
+    gc.fillOval(x-size/4, y-size/4, size/2, size/2);
+    
+    // Añadir identificador si hay espacio
+    if (size > 12) {
         gc.setFill(Color.WHITE);
-        gc.fillText("RP", x - TAMANO_ROBOPUERTO / 2 + 1, y + TAMANO_ROBOPUERTO / 4);
-
+        gc.setFont(new Font("Arial", 10));
+        gc.fillText("RP", x - 7, y + 4);
     }
+    
+    gc.restore();
+}
 
-    private void dibujarCofre(CofreDTO cofre) {
-        GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
-        double x = cofre.posicion().x() * ESCALA_DIBUJO;
-        double y = cofre.posicion().y() * ESCALA_DIBUJO;
+private void dibujarCofre(CofreDTO cofre) {
+    GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
+    double x = cofre.posicion().x() * ESCALA_DIBUJO;
+    double y = cofre.posicion().y() * ESCALA_DIBUJO;
+    double size = TAMANO_COFRE;
 
-        if (cofre.esAccesible()) {
-            gc.setFill(Color.BROWN);
-        } else {
-            gc.setFill(Color.GRAY); // Cofre inaccesible
+    // Determinar color base según accesibilidad y porcentaje de llenado
+    Color colorBase;
+    double porcentajeLlenado = (double) cofre.capacidadActual() / cofre.capacidadMaxima();
+    
+    if (!cofre.esAccesible()) {
+        colorBase = Color.GRAY; // Cofre inaccesible
+    } else {
+        // Gradiente de color según el porcentaje de llenado (verde a rojo)
+        double r = Math.min(1.0, porcentajeLlenado * 2); // Más rojo mientras más lleno
+        double g = Math.min(1.0, (1 - porcentajeLlenado) * 2); // Menos verde mientras más lleno
+        colorBase = Color.color(r * 0.8, g * 0.6, 0.2); // Tonos tierra/cofre
+    }
+    
+    // Sombra
+    gc.setFill(Color.rgb(0, 0, 0, 0.2));
+    gc.fillRect(x - size/2 + 2, y - size/2 + 2, size, size);
+    
+    // Cuerpo principal del cofre
+    gc.setFill(colorBase);
+    gc.fillRect(x - size/2, y - size/2, size, size);
+    
+    // Borde del cofre
+    gc.setStroke(Color.BLACK);
+    gc.setLineWidth(1);
+    gc.strokeRect(x - size/2, y - size/2, size, size);
+    
+    // Dibuja la "tapa" del cofre
+    gc.setFill(colorBase.brighter());
+    gc.fillRect(x - size/2, y - size/2, size, size/4);
+    gc.setStroke(Color.BLACK);
+    gc.strokeRect(x - size/2, y - size/2, size, size/4);
+    
+    // Cerradura/candado
+    gc.setFill(Color.DARKGOLDENROD);
+    gc.fillOval(x - 2, y - size/2 + size/8 - 2, 4, 4);
+    
+    // Indicador de tipo de comportamiento (primera letra del comportamiento principal)
+    if (!cofre.inventario().isEmpty() || cofre.comportamientoDefecto() != null) {
+        String comportamiento = cofre.comportamientoDefecto();
+        if (comportamiento != null && !comportamiento.isEmpty()) {
+            gc.setFill(Color.WHITE);
+            gc.setFont(new Font("Arial Bold", 9));
+            gc.fillText(comportamiento.substring(0, 1).toUpperCase(), x - 3, y + 3);
         }
-        gc.fillRect(x - TAMANO_COFRE / 2, y - TAMANO_COFRE / 2, TAMANO_COFRE, TAMANO_COFRE);
-        gc.setStroke(Color.BLACK);
-        gc.strokeRect(x - TAMANO_COFRE / 2, y - TAMANO_COFRE / 2, TAMANO_COFRE, TAMANO_COFRE);
-
-        // Indicar tipo/contenido (muy básico)
-        // gc.setFill(Color.WHITE);
-        // String iniciales = cofre.tiposComportamientoPorItem().values().stream().findFirst().map(s -> s.substring(0,1)).orElse("?");
-        // gc.fillText(iniciales, x - TAMANO_COFRE/2 + 2, y + TAMANO_COFRE/4);
     }
+    
+    // Indicador de llenado (barra de progreso)
+    if (porcentajeLlenado > 0) {
+        double barraAncho = size * 0.8;
+        double barraAlto = 3;
+        double barraPosX = x - barraAncho/2;
+        double barraPosY = y + size/2 + 4;
+        
+        // Fondo de la barra
+        gc.setFill(Color.rgb(200, 200, 200, 0.8));
+        gc.fillRect(barraPosX, barraPosY, barraAncho, barraAlto);
+        
+        // Barra de progreso
+        Color colorBarra = porcentajeLlenado > 0.8 ? Color.RED :
+                           porcentajeLlenado > 0.6 ? Color.ORANGE :
+                           Color.GREEN;
+        gc.setFill(colorBarra);
+        gc.fillRect(barraPosX, barraPosY, barraAncho * porcentajeLlenado, barraAlto);
+    }
+}
 
-    private void dibujarRobot(RobotDTO robot) {
-        GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
-        double x = robot.posicion().x() * ESCALA_DIBUJO;
-        double y = robot.posicion().y() * ESCALA_DIBUJO;
+private void dibujarRobot(RobotDTO robot) {
+    GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
+    double x = robot.posicion().x() * ESCALA_DIBUJO;
+    double y = robot.posicion().y() * ESCALA_DIBUJO;
 
-        // Dibujar ruta actual si existe
-        if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
-            gc.setStroke(Color.LIGHTGREEN);
-            gc.setLineWidth(1);
-            PuntoDTO pAnterior = robot.posicion();
-            for (PuntoDTO pSiguiente : robot.rutaActual()) {
-                gc.strokeLine(
-                        pAnterior.x() * ESCALA_DIBUJO, pAnterior.y() * ESCALA_DIBUJO,
-                        pSiguiente.x() * ESCALA_DIBUJO, pSiguiente.y() * ESCALA_DIBUJO
-                );
-                pAnterior = pSiguiente;
-            }
+    // Dibujar ruta actual si existe
+    if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
+        gc.setStroke(Color.LIGHTGREEN);
+        gc.setLineWidth(1.5);
+        
+        // Dibujar líneas de la ruta
+        PuntoDTO pAnterior = robot.posicion();
+        for (PuntoDTO pSiguiente : robot.rutaActual()) {
+            gc.strokeLine(
+                pAnterior.x() * ESCALA_DIBUJO, pAnterior.y() * ESCALA_DIBUJO,
+                pSiguiente.x() * ESCALA_DIBUJO, pSiguiente.y() * ESCALA_DIBUJO
+            );
+            // Pequeño círculo en cada punto de la ruta
+            gc.setFill(Color.LIGHTGREEN);
+            gc.fillOval(pSiguiente.x() * ESCALA_DIBUJO - 2, pSiguiente.y() * ESCALA_DIBUJO - 2, 4, 4);
+            pAnterior = pSiguiente;
         }
-
-        gc.setFill(Color.GREEN);
-        gc.fillOval(x - RADIO_ROBOT, y - RADIO_ROBOT, RADIO_ROBOT * 2, RADIO_ROBOT * 2);
-        gc.setStroke(Color.DARKGREEN);
-        gc.strokeOval(x - RADIO_ROBOT, y - RADIO_ROBOT, RADIO_ROBOT * 2, RADIO_ROBOT * 2);
     }
+    
+    // Determinar color basado en estado
+    Color colorRobot;
+    switch (robot.estadoActual()) {
+        case "CARGANDO":
+            colorRobot = Color.ORANGE;
+            break;
+        case "EN_MISION":
+            colorRobot = Color.GREEN;
+            break;
+        case "INACTIVO":
+            colorRobot = Color.RED;
+            break;
+        case "PASIVO":
+            colorRobot = Color.YELLOW;
+            break;
+        default: // ACTIVO u otros
+            colorRobot = Color.LIMEGREEN;
+    }
+    
+    // Calcular el porcentaje de batería para el degradado
+    double porcentajeBateria = robot.nivelBateria() / robot.bateriaMaxima();
+    
+    // Base del robot (círculo)
+    double radio = RADIO_ROBOT;
+    
+    // Sombra
+    gc.setFill(Color.rgb(0, 0, 0, 0.2));
+    gc.fillOval(x - radio + 1, y - radio + 1, radio * 2, radio * 2);
+    
+    // Cuerpo del robot
+    gc.setFill(colorRobot);
+    gc.fillOval(x - radio, y - radio, radio * 2, radio * 2);
+    gc.setStroke(colorRobot.darker());
+    gc.setLineWidth(1);
+    gc.strokeOval(x - radio, y - radio, radio * 2, radio * 2);
+    
+    // Indicador de carga de batería
+    double indicadorRadio = radio * 0.7;
+    if (porcentajeBateria < 0.3) { // Batería baja
+        gc.setFill(Color.RED);
+    } else if (porcentajeBateria < 0.7) { // Batería media
+        gc.setFill(Color.ORANGE);
+    } else { // Batería alta
+        gc.setFill(Color.LIGHTGREEN);
+    }
+    
+    double angulo = 360 * porcentajeBateria;
+    gc.fillArc(x - indicadorRadio, y - indicadorRadio, 
+               indicadorRadio * 2, indicadorRadio * 2, 
+               90, -angulo, ArcType.ROUND);
+    
+    // Indicador de carga (items)
+    if (!robot.itemsEnCarga().isEmpty()) {
+        // Un pequeño cuadrado encima del robot
+        double tamano = 4;
+        gc.setFill(Color.YELLOW);
+        gc.fillRect(x - tamano/2, y - radio - tamano - 2, tamano, tamano);
+    }
+    
+    // ID del robot o alguna otra identificación
+    if (radio > 4) {
+        gc.setFill(Color.WHITE);
+        gc.setFont(new Font("Arial", 8));
+        gc.fillText(robot.id().substring(0, Math.min(2, robot.id().length())), x - 4, y + 3);
+    }
+}
 
 
     // --- Manejo de Selección de Entidades ---
@@ -440,7 +597,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 robot.itemsEnCarga().forEach((item, cant) -> sb.append("  - ").append(item).append(": ").append(cant).append("\n"));
                 sb.append("Estado: ").append(robot.estadoActual()).append("\n");
                 if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
-                    sb.append("Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
+                    sb.append("com.alphaone.logisticaRobots.domain.pathfinding.Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
                 }
                 break;
             case "COFRE":
@@ -471,4 +628,3 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         textAreaDetallesEntidad.setText(sb.toString());
     }
 }
-

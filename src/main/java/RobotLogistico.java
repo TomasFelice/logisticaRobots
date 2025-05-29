@@ -1,26 +1,22 @@
-import com.alphaone.logisticaRobots.domain.Punto;
-import com.alphaone.logisticaRobots.domain.Pedido;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.List;
-import java.util.ArrayList;
+import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.strategy.Inventario;
+import com.alphaone.logisticaRobots.domain.strategy.Item;
+import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
+import com.alphaone.logisticaRobots.domain.strategy.Pedido;
 
 
-import java.util.Objects;
-
-import static java.util.Objects.requireNonNull;
+import java.util.*;
 
 public class RobotLogistico /*implements Ubicable*/ {
     private final int id;
     private Punto posicion;
-    private final Robopuerto robopuertoBase; // esto a validar
     private final int bateriaMaxima;
     private int bateriaActual;  // Cambiado a entero simple
-    private final int capacidadPedidosTraslado;
+    private final static int capacidadPedidosTraslado = 10; // Los robots transportan una cantidad predefinida de ítems en cada viaje. Esta cantidad debe ser configurable a nivel global al momento de correr la simulación.
     private EstadoRobot estado;
+    private Map<Item, Integer> cargaActual;  // Los ítems que está transportando y su cantidad
+    private final Robopuerto robopuertoBase; // el robot empieza en un nodo del camino y puede desplazarse a otro en base a los nodos, sus pesos y cantidad de robots que se tenga
+    private Queue<Pedido> pedidosEncolados; // debe tener una cola de pedidos
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando
     private final Queue<Pedido> pedidosPendientes = new LinkedList<>();
     private final List<Pedido> historialPedidos = new ArrayList<>();
@@ -29,14 +25,16 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
-        this.posicion = requireNonNull(posicion, "Posición no puede ser null");
-        this.robopuertoBase = requireNonNull(robopuertoBase); // de algún lado tiene que salir
+        this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
         this.bateriaMaxima = validarBateria(bateriaMaxima);
         this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
-        this.capacidadPedidosTraslado = validarCapacidadDeTraslado(capacidadPedidosTraslado);
         this.estado = EstadoRobot.ACTIVO; // Estado inicial
-        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE
+        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
+        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
+        this.pedidosEncolados = new LinkedList<>();
     }
+
+    //Getters:
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
@@ -47,6 +45,7 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     // Métodos para manejar los estados del robot
 
+    /*
     public void iniciarMision() {
         cambiarEstado(EstadoRobot.EN_MISION);
     }
@@ -66,7 +65,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     public void desactivar() {
         cambiarEstado(EstadoRobot.INACTIVO);
     }
-
+    esto tal vez se saque ya que para eso hice la clase "cambiarEstado"*/
     public void agregarPedido(Pedido pedido) {
         if (pedido == null) throw new IllegalArgumentException("El pedido no puede ser null");
         pedidosPendientes.add(pedido);
@@ -79,7 +78,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
-        requireNonNull(nuevoEstado, "El nuevo estado no puede ser nulo");
+        Objects.requireNonNull(nuevoEstado, "El nuevo estado no puede ser nulo");
 
         if (!validarTransicion(this.estado, nuevoEstado)) {
             throw new IllegalStateException(
@@ -145,7 +144,7 @@ public class RobotLogistico /*implements Ubicable*/ {
     }
 
     public void consumirBateria(int cantidad) {
-        if (cantidad > bateriaActual && estado != EstadoRobot.INACTIVO) {
+        if (tieneSuficienteBateria(cantidad) && estado != EstadoRobot.INACTIVO) {
             throw new IllegalStateException("No hay suficiente batería");
         }
         bateriaActual -= cantidad;
@@ -181,37 +180,60 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     // Métodos para manejar la carga (ítems)
 
-    private int validarCapacidadDeTraslado(int capacidad) {
-        if (capacidad <= 0) {
-            throw new IllegalArgumentException("La capacidad debe ser un valor positivo");
-        }
-        return capacidad;
-    }
-
     public boolean puedeCargar(int cantidad) {
         int cargaTotal = cargaActual.values().stream().mapToInt(Integer::intValue).sum();
         return cargaTotal + cantidad <= capacidadPedidosTraslado;
     }
 
-    public void agregarCarga(Item item, int cantidad) {
-        if (!puedeCargar(cantidad)) {
-            throw new IllegalStateException("Capacidad de carga excedida");
+
+    public void cargarDesdeCofre(CofreLogistico cofre) {
+
+        Inventario inventarioCofre = cofre.getInventario();
+
+        if (inventarioCofre.estaVacio()) {
+            throw new IllegalArgumentException("El cofre está vacío, no hay items para cargar");
         }
-        cargaActual.merge(item, cantidad, Integer::sum);
+
+        int totalDisponibleEnCofre = inventarioCofre.getTotalItems();
+
+        if (!puedeCargar(totalDisponibleEnCofre)) {
+            throw new IllegalArgumentException(
+                    String.format("El robot no puede cargar %d unidades (capacidad: %d)",
+                            totalDisponibleEnCofre, capacidadPedidosTraslado)
+            );
+        }
+
+        // Si pasó todas las validaciones, proceder a transferir todos los items
+        Map<Item, Integer> itemsATransferir = new HashMap<>(inventarioCofre.getTodos());
+
+        for (Map.Entry<Item, Integer> entry : itemsATransferir.entrySet()) {
+            Item item = entry.getKey();
+            int cantidad = entry.getValue();
+
+            if (cantidad > 0 && inventarioCofre.remover(item, cantidad)) {
+                cargaActual.merge(item, cantidad, Integer::sum);
+            }
+        }
     }
 
-    public void descargarCarga(Item item, int cantidad) { //para despachar en Cofres - pendiente
-        if (cantidad <= 0) {
-            throw new IllegalArgumentException("La cantidad debe ser positiva");
+    public void descargarACofre(CofreLogistico cofre) {
+
+        if (cargaActual == null || cargaActual.isEmpty()) {
+            throw new IllegalArgumentException("El robot no tiene carga para descargar");
         }
-        Integer cantidadActual = cargaActual.get(item);
-        if (cantidadActual == null || cantidadActual < cantidad) {
-            throw new IllegalStateException("No hay suficiente cantidad del ítem para descargar");
-        }
-        if(cantidadActual == cantidad){
-            cargaActual.remove(item);
-        }else{
-            cargaActual.put(item, cantidadActual - cantidad);
+
+        Inventario inventarioCofre = cofre.getInventario();
+
+        for (Map.Entry<Item, Integer> entry : new HashMap<>(cargaActual).entrySet()) {
+            Item item = entry.getKey();
+            int cantidad = entry.getValue();
+
+            if (cantidad > 0) {
+                inventarioCofre.agregar(item, cantidad);
+                cargaActual.remove(item);
+            }
         }
     }
+
+
 }

@@ -1,4 +1,4 @@
-package com.alphaone.logisticaRobots.domain;
+package com.alphaone.logisticaRobots.domain.strategy;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,6 +52,9 @@ public class Inventario {
     public int getTotalItems() {
         return items.values().stream().mapToInt(Integer::intValue).sum();
     }
+
+    public Map<Item, Integer> getItemsDelInventario() {return items;}
+
 
     @Override
     public String toString() {

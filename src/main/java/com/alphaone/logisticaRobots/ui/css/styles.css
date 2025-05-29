@@ -1,0 +1,92 @@
+/* Estilos para todo el Pane principal */
+.root {
+    -fx-background-color: #f5f5f5;
+    -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* Estilos para botones */
+.button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+}
+
+.button:hover {
+    -fx-background-color: #2980b9;
+}
+
+.button:pressed {
+    -fx-background-color: #1f618d;
+}
+
+.button:disabled {
+    -fx-background-color: #bdc3c7;
+    -fx-text-fill: #7f8c8d;
+}
+
+/* Estilos para el botón de cargar configuración */
+#botonCargarConfig {
+    -fx-background-color: #2ecc71;
+}
+
+#botonCargarConfig:hover {
+    -fx-background-color: #27ae60;
+}
+
+#botonCargarConfig:pressed {
+    -fx-background-color: #1e8449;
+}
+
+/* Estilos para el botón resetear */
+#botonResetear {
+    -fx-background-color: #e74c3c;
+}
+
+#botonResetear:hover {
+    -fx-background-color: #c0392b;
+}
+
+#botonResetear:pressed {
+    -fx-background-color: #922b21;
+}
+
+/* Estilos para el TextArea */
+.text-area {
+    -fx-font-family: Consolas, monospace;
+    -fx-font-size: 12px;
+}
+
+/* Estilos para el Label de estado y ciclo */
+#labelCicloActual, #labelEstadoSimulacion {
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+/* Estilos para el Canvas */
+#canvasGrilla {
+    -fx-cursor: crosshair;
+    -fx-background-color: white;
+}
+
+/* Estilos para el ScrollPane */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: #ddd;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: white;
+}
+
+/* Estilos para la barra de título */
+VBox.top {
+    -fx-background-color: #34495e;
+    -fx-padding: 10px;
+}
+
+VBox.top Label {
+    -fx-text-fill: white;
+}

@@ -1,4 +1,4 @@
-package com.alphaone.logisticaRobots.domain;
+package com.alphaone.logisticaRobots.domain.pathfinding;
 
 import java.util.Objects;
 
