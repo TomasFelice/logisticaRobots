@@ -1,5 +1,8 @@
 package com.alphaone.logisticaRobots.domain;
 
+import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
+import com.alphaone.logisticaRobots.domain.strategy.Item;
+
 import java.util.Objects;
 
 public class Pedido {
