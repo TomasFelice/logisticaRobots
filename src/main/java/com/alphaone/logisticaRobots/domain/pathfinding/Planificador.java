@@ -1,11 +1,12 @@
 package com.alphaone.logisticaRobots.domain.pathfinding;
 
+import com.alphaone.logisticaRobots.shared.ParametrosGenerales;
+
 public class Planificador { //lo está haciendo tomi
     //private Grafo grafo; //tiene un mapa
     //private final List<Pedido> pedidos; //tiene una lista de pedidos que priorizar y laburar
 
-
-    public static final double factorConsumo = 1;
+    public static final double factorConsumo = ParametrosGenerales.FACTOR_CONSUMO;
 
 
 //    private void construirGrafo() {

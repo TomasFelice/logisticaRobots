@@ -1,6 +1,5 @@
 package com.alphaone.logisticaRobots.domain;
 
-import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 
 import java.util.ArrayList;

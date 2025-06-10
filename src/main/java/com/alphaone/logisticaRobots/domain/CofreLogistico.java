@@ -1,4 +1,4 @@
-package com.alphaone.logisticaRobots.domain.strategy;
+package com.alphaone.logisticaRobots.domain;
 
 import com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;

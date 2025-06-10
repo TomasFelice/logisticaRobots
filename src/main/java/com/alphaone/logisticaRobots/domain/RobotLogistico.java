@@ -1,10 +1,6 @@
 package com.alphaone.logisticaRobots.domain;
 
-import com.alphaone.logisticaRobots.domain.strategy.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.strategy.Inventario;
-import com.alphaone.logisticaRobots.domain.strategy.Item;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
-import com.alphaone.logisticaRobots.domain.strategy.Pedido;
 
 
 import java.util.*;

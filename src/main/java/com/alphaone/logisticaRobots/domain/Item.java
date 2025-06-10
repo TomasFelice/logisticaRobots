@@ -1,4 +1,4 @@
-package com.alphaone.logisticaRobots.domain.strategy;
+package com.alphaone.logisticaRobots.domain;
 
 import java.util.Objects;
 
