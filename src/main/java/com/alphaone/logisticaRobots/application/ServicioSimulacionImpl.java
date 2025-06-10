@@ -1,8 +1,10 @@
 package com.alphaone.logisticaRobots.application;
 
 import com.alphaone.logisticaRobots.application.dto.*;
+import com.alphaone.logisticaRobots.domain.RedLogistica;
 import com.alphaone.logisticaRobots.domain.Robopuerto;
 import com.alphaone.logisticaRobots.domain.RobotLogistico;
+import com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.domain.CofreLogistico;
 import com.alphaone.logisticaRobots.domain.Item;
