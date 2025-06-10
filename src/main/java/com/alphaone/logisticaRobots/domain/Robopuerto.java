@@ -6,21 +6,35 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class Robopuerto {
-    private final int id;
-    private final Punto posicion;
+public class Robopuerto implements Ubicable {
+    private final String id;
+    private Punto posicion;
     private final double distanciaMaxima;
     private final int tasaRecarga;  // Cantidad de células que recarga por ciclo
+
+    // TODO: Nos hace falta tener los asociados? Creo que es mejor manejarlo con alcance
     private final List<RobotLogistico> robotsAsociados;
     private final List<CofreLogistico> cofresConectados;
+    private final double alcance;
 
-    public Robopuerto(int id, Punto posicion, double distanciaMaxima, int tasaRecarga) {
+    public Robopuerto(String id, Punto posicion, double distanciaMaxima, int tasaRecarga, double alcance) {
         this.id = id;
         this.posicion = Objects.requireNonNull(posicion,"Posición no puede ser null");
         this.distanciaMaxima = validarDistancia(distanciaMaxima);
         this.tasaRecarga = validarTasaRecarga(tasaRecarga);
         this.cofresConectados = new ArrayList<>();
         this.robotsAsociados = new ArrayList<>();
+        this.alcance = alcance;
+    }
+
+    @Override
+    public Punto getPosicion() {
+        return posicion;
+    }
+
+    @Override
+    public void setPosicion(Punto posicion) {
+        this.posicion = posicion;
     }
 
     //INICIO - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia

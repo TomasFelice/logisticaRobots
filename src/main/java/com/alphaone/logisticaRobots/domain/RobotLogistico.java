@@ -5,7 +5,7 @@ import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 
 import java.util.*;
 
-public class RobotLogistico /*implements Ubicable*/ {
+public class RobotLogistico implements Ubicable {
     private final int id;
     private Punto posicion;
     private final int bateriaMaxima;
@@ -35,7 +35,17 @@ public class RobotLogistico /*implements Ubicable*/ {
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
-    public Punto getPosicion() {return posicion;}
+
+    @Override
+    public Punto getPosicion() {
+        return posicion;
+    }
+
+    @Override
+    public void setPosicion(Punto posicion) {
+        this.posicion = posicion;
+    }
+
     public EstadoRobot getEstado() {return estado;}
     public List<Pedido> getHistorialPedidos() { return historialPedidos; }
     public Queue<Pedido> getPedidosPendientes() { return pedidosPendientes; }

@@ -11,13 +11,13 @@ import java.util.UUID;
 /**
  * Representa un cofre logístico con diferentes comportamientos por item
  */
-public abstract class CofreLogistico {
+public class CofreLogistico implements Ubicable {
     private final String id;
     private final Punto posicion;
     private final int capacidadMaxima;
     private final Inventario inventario;
     private final Map<Item, ComportamientoCofre> comportamientos;
-    private com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre comportamientoPorDefecto;
+    private ComportamientoCofre comportamientoPorDefecto;
 
     public CofreLogistico(String id, Punto posicion, int capacidadMaxima) {
         this.id = Objects.requireNonNull(id, "ID no puede ser null");
@@ -37,7 +37,15 @@ public abstract class CofreLogistico {
 
     // Getters
     public String getId() { return id; }
+
+    @Override
     public Punto getPosicion() { return posicion; }
+
+    @Override
+    public void setPosicion(Punto posicion) {
+        this.posicion = posicion;
+    }
+
     public int getCapacidadMaxima() { return capacidadMaxima; }
     public Inventario getInventario() { return inventario; }
 
@@ -114,5 +122,9 @@ public abstract class CofreLogistico {
 
     public Map<Item, Integer> obtenerItemsDisponibles() {
         return inventario.getItemsDelInventario();
+    }
+
+    public String getTipoComportamientoDefecto() {
+        return comportamientoPorDefecto.getTipo();
     }
 }
