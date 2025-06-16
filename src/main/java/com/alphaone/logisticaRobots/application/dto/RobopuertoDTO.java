@@ -8,7 +8,8 @@ import java.util.List;
 public record RobopuertoDTO(
     String id,
     PuntoDTO posicion,
-    double alcanceCobertura,
+    double alcance,
+    int tasaRecarga,
     List<String> idsCofresCubiertos // Lista de IDs de cofres dentro de su zona
 ) {
 }

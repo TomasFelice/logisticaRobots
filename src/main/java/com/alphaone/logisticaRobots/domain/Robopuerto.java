@@ -9,22 +9,40 @@ import java.util.Objects;
 public class Robopuerto implements Ubicable {
     private final String id;
     private Punto posicion;
-    private final double distanciaMaxima;
+    private final double alcance;
     private final int tasaRecarga;  // Cantidad de células que recarga por ciclo
 
     // TODO: Nos hace falta tener los asociados? Creo que es mejor manejarlo con alcance
     private final List<RobotLogistico> robotsAsociados;
     private final List<CofreLogistico> cofresConectados;
-    private final double alcance;
 
-    public Robopuerto(String id, Punto posicion, double distanciaMaxima, int tasaRecarga, double alcance) {
+    public Robopuerto(String id, Punto posicion, double alcance, int tasaRecarga) {
         this.id = id;
         this.posicion = Objects.requireNonNull(posicion,"Posición no puede ser null");
-        this.distanciaMaxima = validarDistancia(distanciaMaxima);
+        this.alcance = validarDistancia(alcance);
         this.tasaRecarga = validarTasaRecarga(tasaRecarga);
         this.cofresConectados = new ArrayList<>();
         this.robotsAsociados = new ArrayList<>();
-        this.alcance = alcance;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public double getAlcance() {
+        return alcance;
+    }
+
+    public int getTasaRecarga() {
+        return tasaRecarga;
+    }
+
+    public List<RobotLogistico> getRobotsAsociados() {
+        return robotsAsociados;
+    }
+
+    public List<CofreLogistico> getCofresConectados() {
+        return cofresConectados;
     }
 
     @Override
@@ -47,7 +65,7 @@ public class Robopuerto implements Ubicable {
     }
 
     public boolean estaEnCobertura(Punto otraUbicacion) {
-        return posicion.distanciaHacia(otraUbicacion) <= distanciaMaxima;
+        return posicion.distanciaHacia(otraUbicacion) <= alcance;
     }
 
     //FIN - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia
@@ -89,7 +107,7 @@ public class Robopuerto implements Ubicable {
         return tasaRecarga;
     }
 
-    public void recargarRobot(RobotLogistico robot) { // Podríamos hacer un exception acá como: RecargaNoPermitidaException?
+    public void recargarRobot(RobotLogistico robot) { // ¿Podríamos hacer un exception acá como: RecargaNoPermitidaException?
         if (!robot.getPosicion().equals(this.posicion)) {
             throw new IllegalStateException("El robot no está en la posición del robopuerto para ser cargado");
         }

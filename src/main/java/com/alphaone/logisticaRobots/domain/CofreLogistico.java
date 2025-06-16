@@ -43,7 +43,8 @@ public class CofreLogistico implements Ubicable {
 
     @Override
     public void setPosicion(Punto posicion) {
-        this.posicion = posicion;
+        // Cannot set position for CofreLogistico as it's a final field
+        throw new UnsupportedOperationException("No se puede cambiar la posición de un cofre logístico");
     }
 
     public int getCapacidadMaxima() { return capacidadMaxima; }

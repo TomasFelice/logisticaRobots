@@ -32,6 +32,15 @@ public class RobotLogistico implements Ubicable {
     }
 
     //Getters:
+    public int getId() {return id;}
+    public Robopuerto getRobopuertoBase() {return robopuertoBase;}
+    public Map<Item, Integer> getCargaActual() {return cargaActual;}
+    public int getCantidadPedidosEncolados() {return pedidosEncolados.size();}
+    public int getCantidadPedidosPendientes() {return pedidosPendientes.size();}
+    public int getCantidadHistorialPedidos() {return historialPedidos.size();}
+    public int getCantidadPedidos() {return historialPedidos.size() + pedidosPendientes.size();}
+    public int getCantidadPedidosEnProceso() {return (pedidoActual != null) ? 1 : 0;}
+    public int getCantidadPedidosCompletados() {return historialPedidos.size();}
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
@@ -82,6 +91,204 @@ public class RobotLogistico implements Ubicable {
         historialPedidos.add(pedidoActual);
         pedidoActual = null;
         cambiarEstado(EstadoRobot.ACTIVO);
+    }
+
+    /**
+     * Procesa el siguiente pedido pendiente.
+     * Este método debe ser llamado en cada ciclo de simulación para que el robot
+     * avance en la ejecución de sus pedidos.
+     * 
+     * @return true si se procesó un pedido, false si no había pedidos pendientes
+     */
+    public boolean procesarSiguientePedido() {
+        // Si ya hay un pedido en proceso, continuar con él
+        if (pedidoActual != null) {
+            return continuarPedidoActual();
+        }
+
+        // Si no hay pedido actual pero hay pendientes, tomar el siguiente
+        if (!pedidosPendientes.isEmpty()) {
+            pedidoActual = pedidosPendientes.poll();
+            pedidoActual.marcarEnProceso();
+            cambiarEstado(EstadoRobot.EN_MISION);
+            return true;
+        }
+
+        // No hay pedidos para procesar
+        return false;
+    }
+
+    /**
+     * Continúa con el procesamiento del pedido actual.
+     * 
+     * @return true si el pedido sigue en proceso, false si se completó o falló
+     */
+    private boolean continuarPedidoActual() {
+        if (pedidoActual == null) {
+            return false;
+        }
+
+        // Verificar si tenemos suficiente batería para continuar
+        if (!tieneSuficienteBateria(10)) {
+            // Necesitamos recargar
+            cambiarEstado(EstadoRobot.PASIVO);
+            System.out.println("Robot " + id + " necesita recargar. Batería actual: " + bateriaActual);
+            return true;
+        }
+
+        // Obtener los cofres de origen y destino
+        CofreLogistico origen = pedidoActual.getCofreOrigen();
+        CofreLogistico destino = pedidoActual.getCofreDestino();
+        Item item = pedidoActual.getItem();
+        int cantidad = pedidoActual.getCantidad();
+
+        // Estado del pedido: 
+        // 1. Moverse al cofre de origen
+        // 2. Recoger los items
+        // 3. Moverse al cofre de destino
+        // 4. Entregar los items
+
+        // Verificar si estamos en el cofre de origen
+        if (!posicion.equals(origen.getPosicion())) {
+            // Moverse hacia el cofre de origen
+            double distancia = posicion.distanciaHacia(origen.getPosicion());
+
+            // Si estamos muy cerca, llegamos directamente
+            if (distancia <= 1.0) {
+                setPosicion(origen.getPosicion());
+                System.out.println("Robot " + id + " llegó al cofre de origen " + origen.getId());
+            } else {
+                // Calcular cuánto nos movemos en este ciclo (máximo 5 unidades)
+                double movimiento = Math.min(5.0, distancia);
+
+                // Calcular nueva posición (movimiento parcial hacia el destino)
+                double porcentajeMovimiento = movimiento / distancia;
+                int newX = (int) (posicion.getX() + (origen.getPosicion().getX() - posicion.getX()) * porcentajeMovimiento);
+                int newY = (int) (posicion.getY() + (origen.getPosicion().getY() - posicion.getY()) * porcentajeMovimiento);
+
+                setPosicion(new Punto(newX, newY));
+
+                // Consumir batería basado en la distancia recorrida
+                int consumoBateria = (int) Math.ceil(movimiento);
+                try {
+                    consumirBateria(consumoBateria);
+                    System.out.println("Robot " + id + " moviéndose hacia cofre origen. Posición: " + posicion + 
+                                      ", Batería: " + bateriaActual + "/" + bateriaMaxima);
+                } catch (IllegalStateException e) {
+                    pedidoActual.marcarFallido();
+                    finalizarPedido();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Si estamos en el cofre de origen pero no hemos cargado los items
+        if (posicion.equals(origen.getPosicion()) && !cargaActual.containsKey(item)) {
+            // Verificar si el cofre tiene suficientes items
+            if (origen.getInventario().getCantidad(item) >= cantidad) {
+                try {
+                    // Cargar el item desde el cofre
+                    if (origen.removerItem(item, cantidad)) {
+                        cargaActual.put(item, cantidad);
+                        System.out.println("Robot " + id + " cargó " + cantidad + " unidades de " + 
+                                          item.getNombre() + " desde " + origen.getId());
+
+                        // Consumir batería por la operación de carga
+                        consumirBateria(2);
+                    } else {
+                        // No se pudo remover el item (quizás otro robot lo tomó mientras tanto)
+                        pedidoActual.marcarFallido();
+                        finalizarPedido();
+                        return false;
+                    }
+                } catch (Exception e) {
+                    pedidoActual.marcarFallido();
+                    finalizarPedido();
+                    return false;
+                }
+            } else {
+                // No hay suficientes items
+                System.out.println("Robot " + id + " no pudo cargar items. Cantidad insuficiente en " + origen.getId());
+                pedidoActual.marcarFallido();
+                finalizarPedido();
+                return false;
+            }
+        }
+
+        // Si ya cargamos los items pero no estamos en el destino
+        if (cargaActual.containsKey(item) && !posicion.equals(destino.getPosicion())) {
+            // Moverse hacia el cofre de destino
+            double distancia = posicion.distanciaHacia(destino.getPosicion());
+
+            // Si estamos muy cerca, llegamos directamente
+            if (distancia <= 1.0) {
+                setPosicion(destino.getPosicion());
+                System.out.println("Robot " + id + " llegó al cofre de destino " + destino.getId());
+            } else {
+                // Calcular cuánto nos movemos en este ciclo (máximo 5 unidades)
+                double movimiento = Math.min(5.0, distancia);
+
+                // Calcular nueva posición (movimiento parcial hacia el destino)
+                double porcentajeMovimiento = movimiento / distancia;
+                int newX = (int) (posicion.getX() + (destino.getPosicion().getX() - posicion.getX()) * porcentajeMovimiento);
+                int newY = (int) (posicion.getY() + (destino.getPosicion().getY() - posicion.getY()) * porcentajeMovimiento);
+
+                setPosicion(new Punto(newX, newY));
+
+                // Consumir batería basado en la distancia recorrida (más consumo por llevar carga)
+                int consumoBateria = (int) Math.ceil(movimiento * 1.5); // 50% más de consumo por llevar carga
+                try {
+                    consumirBateria(consumoBateria);
+                    System.out.println("Robot " + id + " moviéndose hacia cofre destino. Posición: " + posicion + 
+                                      ", Batería: " + bateriaActual + "/" + bateriaMaxima);
+                } catch (IllegalStateException e) {
+                    pedidoActual.marcarFallido();
+                    finalizarPedido();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Si estamos en el destino y tenemos los items, entregarlos
+        if (posicion.equals(destino.getPosicion()) && cargaActual.containsKey(item)) {
+            try {
+                // Entregar los items al cofre destino
+                int cantidadEntrega = cargaActual.get(item);
+                if (destino.agregarItem(item, cantidadEntrega)) {
+                    // Limpiar la carga del robot
+                    cargaActual.remove(item);
+
+                    // Marcar el pedido como completado
+                    pedidoActual.marcarCompletado();
+                    System.out.println("Robot " + id + " entregó " + cantidadEntrega + " unidades de " + 
+                                      item.getNombre() + " a " + destino.getId() + ". Pedido completado.");
+
+                    // Consumir batería por la operación de descarga
+                    consumirBateria(2);
+
+                    finalizarPedido();
+                    return false;
+                } else {
+                    // No se pudo entregar (quizás el cofre está lleno)
+                    System.out.println("Robot " + id + " no pudo entregar items. Cofre " + destino.getId() + " sin espacio.");
+                    pedidoActual.marcarFallido();
+                    finalizarPedido();
+                    return false;
+                }
+            } catch (Exception e) {
+                pedidoActual.marcarFallido();
+                finalizarPedido();
+                return false;
+            }
+        }
+
+        // Si llegamos aquí, algo salió mal
+        System.out.println("Robot " + id + " encontró un estado inesperado en el procesamiento del pedido.");
+        pedidoActual.marcarFallido();
+        finalizarPedido();
+        return false;
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {
@@ -151,8 +358,8 @@ public class RobotLogistico implements Ubicable {
     }
 
     public void consumirBateria(int cantidad) {
-        if (tieneSuficienteBateria(cantidad) && estado != EstadoRobot.INACTIVO) {
-            throw new IllegalStateException("No hay suficiente batería");
+        if (!tieneSuficienteBateria(cantidad) || estado == EstadoRobot.INACTIVO) {
+            throw new IllegalStateException("No hay suficiente batería o el robot está inactivo");
         }
         bateriaActual -= cantidad;
     }
@@ -240,6 +447,61 @@ public class RobotLogistico implements Ubicable {
                 cargaActual.remove(item);
             }
         }
+    }
+
+    /**
+     * Obtiene la ruta actual que está siguiendo el robot.
+     * Calcula una ruta desde la posición actual del robot hasta su destino,
+     * basándose en el estado actual del pedido que está procesando.
+     * 
+     * @return Lista de puntos que representan la ruta actual del robot
+     */
+    public List<Punto> getRutaActual() {
+        List<Punto> ruta = new ArrayList<>();
+
+        // Si no hay pedido actual, no hay ruta
+        if (pedidoActual == null) {
+            return ruta;
+        }
+
+        // Obtener los cofres de origen y destino
+        CofreLogistico origen = pedidoActual.getCofreOrigen();
+        CofreLogistico destino = pedidoActual.getCofreDestino();
+        Item item = pedidoActual.getItem();
+
+        // Determinar el destino actual basado en el estado del pedido
+        Punto puntoDestino;
+
+        // Si no hemos llegado al origen o no hemos cargado los items, el destino es el origen
+        if (!posicion.equals(origen.getPosicion()) || !cargaActual.containsKey(item)) {
+            puntoDestino = origen.getPosicion();
+        } 
+        // Si ya cargamos los items pero no estamos en el destino, el destino es el destino
+        else if (cargaActual.containsKey(item) && !posicion.equals(destino.getPosicion())) {
+            puntoDestino = destino.getPosicion();
+        } 
+        // Si ya estamos en el destino, no hay ruta
+        else {
+            return ruta;
+        }
+
+        // Calcular la ruta como una línea recta entre la posición actual y el destino
+        // Dividimos la distancia en segmentos para crear una ruta más detallada
+        double distancia = posicion.distanciaHacia(puntoDestino);
+        int numSegmentos = Math.max(10, (int)distancia / 5); // Al menos 10 segmentos, o uno cada 5 unidades
+
+        // Agregar la posición actual como primer punto de la ruta
+        ruta.add(new Punto(posicion.getX(), posicion.getY()));
+
+        // Calcular puntos intermedios
+        for (int i = 1; i <= numSegmentos; i++) {
+            double porcentaje = (double) i / numSegmentos;
+            int x = (int) (posicion.getX() + (puntoDestino.getX() - posicion.getX()) * porcentaje);
+            int y = (int) (posicion.getY() + (puntoDestino.getY() - posicion.getY()) * porcentaje);
+            ruta.add(new Punto(x, y));
+        }
+
+        return ruta;
     }
 
 

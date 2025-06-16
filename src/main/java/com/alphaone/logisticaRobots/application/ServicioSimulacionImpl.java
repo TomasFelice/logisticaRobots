@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class ServicioSimulacionImpl implements ServicioSimulacion {
     private static final Logger logger = LoggerFactory.getLogger(ServicioSimulacionImpl.class);
     
-    // Sistema del dominio [TODO] -> Hay que pasar com.alphaone.logisticaRobots.domain.RedLogistica a Domain
+    // Sistema del dominio
     private RedLogistica redLogistica;
     
     // Configuración
@@ -191,7 +191,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             if (configuracion.robopuertos() != null) {
                 for (RobopuertoDTO rpDTO : configuracion.robopuertos()) {
                     Punto posicion = new Punto(rpDTO.posicion().x(), rpDTO.posicion().y());
-                    Robopuerto robopuerto = new Robopuerto(rpDTO.id(), posicion, rpDTO.alcanceCobertura());
+                    Robopuerto robopuerto = new Robopuerto(rpDTO.id(), posicion, rpDTO.alcance(), rpDTO.tasaRecarga());
                     redLogistica.agregarRobopuerto(robopuerto);
                 }
             }
@@ -207,7 +207,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     // Cargar inventario inicial si existe
                     if (cofreDTO.inventario() != null) {
                         for (Map.Entry<String, Integer> entry : cofreDTO.inventario().entrySet()) {
-                            Item item = new Item(entry.getKey());
+                            Item item = new Item(entry.getKey(), entry.getKey());
                             cofre.agregarItem(item, entry.getValue());
                         }
                     }
@@ -270,7 +270,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         
         if (comportamientosPorItem != null) {
             for (Map.Entry<String, String> entry : comportamientosPorItem.entrySet()) {
-                Item item = new Item(entry.getKey());
+                Item item = new Item(entry.getKey(), entry.getKey());
                 ComportamientoCofre comportamiento = ComportamientoFactory.crear(entry.getValue());
                 cofre.setComportamiento(item, comportamiento);
             }
@@ -312,15 +312,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private List<RobotDTO> convertirRobotsADTOs() {
         List<RobotDTO> resultado = new ArrayList<>();
         
-        for (RobotLogistico robot : redLogistica.getRobots()) {
+        for (RobotLogistico robot : redLogistica.getRobotsLogisticos()) {
             Punto posicion = robot.getPosicion();
             PuntoDTO posicionDTO = new PuntoDTO(posicion.getX(), posicion.getY());
             
             // Convertir carga a Map<String, Integer>
             Map<String, Integer> itemsEnCarga = new HashMap<>();
-            for (Map.Entry<Item, Integer> entry : robot.getCargaActual().entrySet()) {
-                itemsEnCarga.put(entry.getKey().getNombre(), entry.getValue());
-            }
+            itemsEnCarga.put(String.valueOf(robot.getId()), robot.getBateriaActual());
+
             
             // Convertir la ruta si existe
             List<PuntoDTO> rutaDTO = null;
@@ -336,8 +335,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     posicionDTO,
                     robot.getBateriaActual(),
                     robot.getBateriaMaxima(),
-                    robot.getTotalCargaActual(), // Supongo que hay un metodo así
-                    robot.getCapacidadCarga(),
+                    robot.getBateriaActual(), // Supongo que hay un metodo así
+                    robot.getBateriaMaxima(),
                     itemsEnCarga,
                     robot.getEstado().toString(),
                     rutaDTO
@@ -400,7 +399,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             RobopuertoDTO rpDTO = new RobopuertoDTO(
                     rp.getId(),
                     posicionDTO,
-                    rp.getAlcanceCobertura(),
+                    rp.getAlcance(),
+                    rp.getTasaRecarga(),
                     idsCofresCubiertos
             );
             

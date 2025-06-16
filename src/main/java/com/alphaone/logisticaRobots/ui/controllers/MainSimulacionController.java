@@ -16,7 +16,7 @@ import javafx.stage.FileChooser;
 
 import java.io.File;
 import java.util.List;
-import java.util.Map;
+
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
@@ -302,7 +302,7 @@ private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
     GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
     double x = robopuerto.posicion().x() * ESCALA_DIBUJO;
     double y = robopuerto.posicion().y() * ESCALA_DIBUJO;
-    double alcance = robopuerto.alcanceCobertura() * ESCALA_DIBUJO;
+    double alcance = robopuerto.alcance() * ESCALA_DIBUJO;
 
     // Dibujar zona de cobertura con un gradiente radial
     gc.save();
@@ -618,7 +618,7 @@ private void dibujarRobot(RobotDTO robot) {
                 sb.append("--- ROBOPUERTO ---\n");
                 sb.append("ID: ").append(rp.id()).append("\n");
                 sb.append("Posición: ").append(rp.posicion()).append("\n");
-                sb.append("Alcance: ").append(rp.alcanceCobertura()).append("\n");
+                sb.append("Alcance: ").append(rp.alcance()).append("\n");
                 sb.append("Cofres cubiertos: ").append(rp.idsCofresCubiertos() != null ? rp.idsCofresCubiertos().size() : 0).append("\n");
                 // rp.idsCofresCubiertos().forEach(id -> sb.append("  - ").append(id).append("\n")); // Podría ser muy largo
                 break;
