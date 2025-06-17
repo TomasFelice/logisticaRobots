@@ -1,6 +1,7 @@
 package com.alphaone.logisticaRobots.domain;
 
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
+import com.alphaone.logisticaRobots.shared.ParametrosGenerales;
 
 
 import java.util.*;
@@ -169,7 +170,7 @@ public class RobotLogistico implements Ubicable {
                 setPosicion(new Punto(newX, newY));
 
                 // Consumir batería basado en la distancia recorrida
-                int consumoBateria = (int) Math.ceil(movimiento);
+                int consumoBateria = (int) Math.ceil(movimiento * ParametrosGenerales.FACTOR_CONSUMO);
                 try {
                     consumirBateria(consumoBateria);
                     System.out.println("Robot " + id + " moviéndose hacia cofre origen. Posición: " + posicion + 
@@ -237,7 +238,7 @@ public class RobotLogistico implements Ubicable {
                 setPosicion(new Punto(newX, newY));
 
                 // Consumir batería basado en la distancia recorrida (más consumo por llevar carga)
-                int consumoBateria = (int) Math.ceil(movimiento * 1.5); // 50% más de consumo por llevar carga
+                int consumoBateria = (int) Math.ceil(movimiento * ParametrosGenerales.FACTOR_CONSUMO * 1.5); // 50% más de consumo por llevar carga
                 try {
                     consumirBateria(consumoBateria);
                     System.out.println("Robot " + id + " moviéndose hacia cofre destino. Posición: " + posicion + 
@@ -382,7 +383,7 @@ public class RobotLogistico implements Ubicable {
 
     public void moverA(Punto nuevaUbicacion) {
         double distancia = posicion.distanciaHacia(nuevaUbicacion);
-        int bateriaNecesaria = (int) Math.ceil(distancia);  // Asumiendo factor de consumo = 1 | a cambiar esto para que sea dinámico
+        int bateriaNecesaria = (int) Math.ceil(distancia * ParametrosGenerales.FACTOR_CONSUMO);  // Asumiendo factor de consumo = 1 | a cambiar esto para que sea dinámico
 
         if (!tieneSuficienteBateria(bateriaNecesaria)) {
             throw new IllegalStateException("Energía insuficiente para el movimiento");

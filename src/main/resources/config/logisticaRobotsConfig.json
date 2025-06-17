@@ -1,0 +1,114 @@
+{
+  "grilla": {
+    "dimensiones": {
+      "ancho": 10,
+      "alto": 10
+    }
+  },
+  "factorConsumo": 1.2,
+  "robopuertos": [
+    {
+      "id": 1,
+      "posicion": {
+        "x": 2,
+        "y": 2
+      },
+      "alcance": 4,
+      "cargasSimultaneas": 2,
+      "estado": "activo"
+    },
+    {
+      "id": 2,
+      "posicion": {
+        "x": 7,
+        "y": 7
+      },
+      "alcance": 3,
+      "cargasSimultaneas": 1,
+      "estado": "activo"
+    }
+  ],
+  "robots": [
+    {
+      "robopuertoInicial": 1,
+      "capacidadMaximaBateria": 100,
+      "cargaBateriaActual": 80,
+      "capacidadTraslado": 5,
+      "estado": "disponible"
+    },
+    {
+      "robopuertoInicial": 2,
+      "capacidadMaximaBateria": 120,
+      "cargaBateriaActual": 100,
+      "capacidadTraslado": 8,
+      "estado": "disponible"
+    }
+  ],
+  "items": [
+    {
+      "nombre": "tornillos"
+    },
+    {
+      "nombre": "tuercas"
+    },
+    {
+      "nombre": "arandelas"
+    }
+  ],
+  "cofres": [
+    {
+      "posicion": {
+        "x": 0,
+        "y": 0
+      },
+      "capacidadMaxima": 20,
+      "itemsSolicitados": [
+        {
+          "item": "tornillos",
+          "cantidad": 5
+        }
+      ],
+      "itemsAlmacenados": [
+        {
+          "item": "tuercas",
+          "cantidad": 8
+        }
+      ],
+      "itemsOfrecidos": [
+        {
+          "item": "tuercas",
+          "cantidad": 5
+        }
+      ]
+    },
+    {
+      "posicion": {
+        "x": 9,
+        "y": 9
+      },
+      "capacidadMaxima": 15,
+      "itemsSolicitados": [
+        {
+          "item": "tuercas",
+          "cantidad": 3
+        },
+        {
+          "item": "arandelas",
+          "cantidad": 4
+        }
+      ],
+      "itemsAlmacenados": [
+        {
+          "item": "tornillos",
+          "cantidad": 10
+        }
+      ],
+      "itemsOfrecidos": [
+        {
+          "item": "tornillos",
+          "cantidad": 5
+        }
+      ]
+    }
+  ]
+}
