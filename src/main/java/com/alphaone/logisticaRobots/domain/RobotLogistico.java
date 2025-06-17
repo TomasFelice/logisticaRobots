@@ -504,5 +504,14 @@ public class RobotLogistico implements Ubicable {
         return ruta;
     }
 
+    public int getCargaActualTotal() {
+        return cargaActual.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    public boolean puedeAlcanzar(Punto destino) {
+        double distancia = posicion.distanciaHacia(destino);
+        int bateriaRequerida = (int) Math.ceil(distancia);
+        return tieneSuficienteBateria(bateriaRequerida);
+    }
 
 }
