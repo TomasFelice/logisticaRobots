@@ -1,15 +1,13 @@
 package com.alphaone.logisticaRobots.application;
 
 import com.alphaone.logisticaRobots.application.dto.*;
-import com.alphaone.logisticaRobots.domain.RedLogistica;
-import com.alphaone.logisticaRobots.domain.Robopuerto;
-import com.alphaone.logisticaRobots.domain.RobotLogistico;
+import com.alphaone.logisticaRobots.domain.*;
 import com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
-import com.alphaone.logisticaRobots.domain.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.Item;
 import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
+import com.alphaone.logisticaRobots.domain.comportamiento.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,42 +17,47 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
 /**
  * Implementación del servicio de simulación que gestiona la lógica y el estado del sistema.
  */
 public class ServicioSimulacionImpl implements ServicioSimulacion {
     private static final Logger logger = LoggerFactory.getLogger(ServicioSimulacionImpl.class);
-    
+
     // Sistema del dominio
     private RedLogistica redLogistica;
-    
+
     // Configuración
     private File archivoConfigActual;
     private int velocidadSimulacion = 1000; // milisegundos entre ciclos
-    
+
     // com.alphaone.logisticaRobots.domain.Estado de la simulación
     private boolean enEjecucion = false;
     private int cicloActual = 0;
     private String estadoGeneral = "NO_INICIADO";
     private String mensajeEstado = "Sistema no iniciado";
-    
+
     // Dimensiones de la grilla (configurables desde archivo)
     private int anchoGrilla = 50;
     private int altoGrilla = 50;
-    
+
     // Scheduler para ejecución automática
     private ScheduledExecutorService scheduler;
-    
+
     // Observadores
     private final List<ObservadorEstadoSimulacion> observadores = new CopyOnWriteArrayList<>();
-    
+
+    // Loader del config
+    private final LogisticaRobotsConfigLoader configLoader;
+
     // Constructor
     public ServicioSimulacionImpl() {
         // Inicializar objetos necesarios
-        this.redLogistica = new RedLogistica(); // O cómo se inicialice en tu implementación
+        this.redLogistica = new RedLogistica();
+        this.configLoader = new LogisticaRobotsConfigLoader();
     }
-    
+
     @Override
     public void iniciarSimulacion() {
         if (redLogistica == null || redLogistica.estaVacia()) {
@@ -62,12 +65,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             notificarObservadores();
             return;
         }
-        
+
         if (!enEjecucion) {
             enEjecucion = true;
             estadoGeneral = "INICIADA";
             mensajeEstado = "Simulación iniciada";
-            
+
             // Iniciar ejecución automática en un hilo separado
             scheduler = Executors.newSingleThreadScheduledExecutor();
             scheduler.scheduleAtFixedRate(
@@ -76,11 +79,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     velocidadSimulacion,
                     TimeUnit.MILLISECONDS
             );
-            
+
             notificarObservadores();
         }
     }
-    
+
     @Override
     public void pausarSimulacion() {
         if (enEjecucion && scheduler != null) {
@@ -92,18 +95,18 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             notificarObservadores();
         }
     }
-    
+
     @Override
     public void resetearSimulacion() {
         // Detener la simulación si está en marcha
         if (enEjecucion) {
             pausarSimulacion();
         }
-        
+
         // Resetear variables
         cicloActual = 0;
         estadoGeneral = "NO_INICIADO";
-        
+
         // Si hay un archivo de configuración cargado, lo recargamos
         if (archivoConfigActual != null) {
             try {
@@ -117,10 +120,10 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             redLogistica = new RedLogistica(); // O como se reinicie
             mensajeEstado = "Simulación reseteada";
         }
-        
+
         notificarObservadores();
     }
-    
+
     @Override
     public void avanzarCicloSimulacion() {
         if (redLogistica == null || redLogistica.estaVacia()) {
@@ -128,12 +131,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             notificarObservadores();
             return;
         }
-        
+
         if (!enEjecucion) { // Solo avanzamos manualmente si no está en ejecución automática
             cicloSimulacionSeguro();
         }
     }
-    
+
     // Metodo que ejecuta un ciclo de simulación con manejo de excepciones
     private void cicloSimulacionSeguro() {
         try {
@@ -147,14 +150,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             notificarObservadores();
         }
     }
-    
+
     // Implementación real del ciclo
     private void ejecutarCicloSimulacion() {
         // Aquí iría la llamada al metodo simularCiclo() de com.alphaone.logisticaRobots.domain.RedLogistica
         redLogistica.simularCiclo();
-        
+
         cicloActual++;
-        
+
         // Verificar si se alcanzó un estado estable
         if (redLogistica.haAlcanzadoEstadoEstable()) {
             pausarSimulacion();
@@ -165,125 +168,231 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             mensajeEstado = "Ciclo " + cicloActual + " completado";
         }
     }
-    
+
     @Override
     public void cargarConfiguracion(File archivoConfig) throws Exception {
         Objects.requireNonNull(archivoConfig, "El archivo no puede ser null");
-        
+
         if (!archivoConfig.exists() || !archivoConfig.canRead()) {
             throw new IllegalArgumentException("Archivo no existe o no se puede leer: " + archivoConfig.getPath());
         }
-        
+
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            ConfiguracionSimulacionDTO configuracion = mapper.readValue(archivoConfig, ConfiguracionSimulacionDTO.class);
-            
-            // Crear nueva red y cargar según la configuración
-            this.redLogistica = new RedLogistica(); // O como corresponda
-            
-            // Configurar dimensiones de la grilla
-            if (configuracion.dimensionGrilla() != null) {
-                this.anchoGrilla = configuracion.dimensionGrilla().ancho();
-                this.altoGrilla = configuracion.dimensionGrilla().alto();
-            }
-            
-            // Cargar robopuertos
-            if (configuracion.robopuertos() != null) {
-                for (RobopuertoDTO rpDTO : configuracion.robopuertos()) {
-                    Punto posicion = new Punto(rpDTO.posicion().x(), rpDTO.posicion().y());
-                    Robopuerto robopuerto = new Robopuerto(rpDTO.id(), posicion, rpDTO.alcance(), rpDTO.tasaRecarga());
-                    redLogistica.agregarRobopuerto(robopuerto);
-                }
-            }
-            
-            // Cargar cofres
-            if (configuracion.cofres() != null) {
-                for (CofreDTO cofreDTO : configuracion.cofres()) {
-                    Punto posicion = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
-                    CofreLogistico cofre = crearCofreSegunTipo(
-                            cofreDTO.id(), posicion, cofreDTO.capacidadMaxima(), 
-                            cofreDTO.comportamientoDefecto(), cofreDTO.tiposComportamientoPorItem());
-                    
-                    // Cargar inventario inicial si existe
-                    if (cofreDTO.inventario() != null) {
-                        for (Map.Entry<String, Integer> entry : cofreDTO.inventario().entrySet()) {
-                            Item item = new Item(entry.getKey(), entry.getKey());
-                            cofre.agregarItem(item, entry.getValue());
-                        }
-                    }
-                    
-                    redLogistica.agregarCofre(cofre);
-                }
-            }
-            
-            // Cargar robots
-            if (configuracion.robots() != null) {
-                for (RobotDTO robotDTO : configuracion.robots()) {
-                    Punto posicion = new Punto(robotDTO.posicion().x(), robotDTO.posicion().y());
-                    // Encontrar el robopuerto base para este robot
-                    Robopuerto robopuertoBase = redLogistica.getRobopuertoMasCercano(posicion);
-                    if (robopuertoBase == null) {
-                        throw new IllegalStateException("No se encontró robopuerto cercano para robot en " + posicion);
-                    }
-                    
-                    RobotLogistico robot = new RobotLogistico(
-                            Integer.parseInt(robotDTO.id()), 
-                            posicion, 
-                            robopuertoBase,
-                            (int) robotDTO.bateriaMaxima(),
-                            robotDTO.capacidadCarga());
-                    
-                    redLogistica.agregarRobot(robot);
-                }
-            }
-            
-            // Establecer velocidad de simulación si está configurada
-            velocidadSimulacion = configuracion.velocidadSimulacion() > 0 ? 
-                    configuracion.velocidadSimulacion() : 1000; // valor por defecto
-            
-            // Guardar referencia al archivo actual
-            this.archivoConfigActual = archivoConfig;
-            
-            // Actualizar estado
-            cicloActual = 0;
-            estadoGeneral = "NO_INICIADO";
-            mensajeEstado = "Configuración cargada exitosamente";
-            
-            notificarObservadores();
-            
-            logger.info("Configuración cargada desde {}", archivoConfig.getPath());
-            
+            // Usar el configLoader inyectado
+            ConfiguracionSimulacionDTO configuracion = configLoader.cargarConfiguracion();
+
+            // Resto del código igual...
+            procesarConfiguracion(configuracion, archivoConfig);
+
+        } catch (IOException e) {
+            logger.error("Error de E/S al cargar la configuración desde {}", archivoConfig.getPath(), e);
+            throw new Exception("Error de E/S al cargar configuración: " + e.getMessage(), e);
         } catch (Exception e) {
             logger.error("Error al cargar la configuración desde {}", archivoConfig.getPath(), e);
             throw new Exception("Error al cargar configuración: " + e.getMessage(), e);
         }
     }
-    
-    private CofreLogistico crearCofreSegunTipo(String id, Punto posicion, int capacidad, 
-                                                String comportamientoPorDefecto, 
-                                                Map<String, String> comportamientosPorItem) {
-        // Aquí iría la lógica para crear el tipo de cofre adecuado
-        // Probablemente delegarías esto a una factory o clase especializada
-        
-        // Código simplificado para el ejemplo:
+
+    // Método auxiliar para procesamiento de configuración (extrae lógica común)
+    private void procesarConfiguracion(ConfiguracionSimulacionDTO configuracion, File archivoConfig) {
+        // Crear nueva red y cargar según la configuración
+        this.redLogistica = new RedLogistica();
+
+        // Configurar dimensiones de la grilla
+        if (configuracion.dimensionGrilla() != null) {
+            this.anchoGrilla = configuracion.dimensionGrilla().ancho();
+            this.altoGrilla = configuracion.dimensionGrilla().alto();
+        }
+
+        // Cargar robopuertos
+        if (configuracion.robopuertos() != null) {
+            configuracion.robopuertos().forEach(this::cargarRobopuerto);
+        }
+
+        // Cargar cofres
+        if (configuracion.cofres() != null) {
+            configuracion.cofres().forEach(this::cargarCofre);
+        }
+
+        // Cargar robots
+        if (configuracion.robots() != null) {
+            configuracion.robots().forEach(this::cargarRobot);
+        }
+
+        // Cargar pedidos - generar automáticamente desde los cofres
+        cargarPedidosDesdeConfiguracion(configuracion);
+
+        // Establecer velocidad de simulación
+        velocidadSimulacion = configuracion.velocidadSimulacion() > 0 ?
+                configuracion.velocidadSimulacion() : 1000;
+
+        // Actualizar estado
+        this.archivoConfigActual = archivoConfig;
+        cicloActual = 0;
+        estadoGeneral = "NO_INICIADO";
+        mensajeEstado = "Configuración cargada exitosamente";
+
+        notificarObservadores();
+        logger.info("Configuración cargada desde {}", archivoConfig.getPath());
+    }
+
+    // Método auxiliar para cargar pedidos desde la configuración
+    private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion) {
+        if (configuracion.cofres() == null || configuracion.cofres().isEmpty()) {
+            return;
+        }
+
+        List<Pedido> pedidosGenerados = new ArrayList<>();
+        int contadorPedidos = 1;
+
+        // Generar pedidos basados en los items solicitados de cada cofre
+        for (CofreDTO cofreDTO : configuracion.cofres()) {
+            if (cofreDTO.itemsSolicitados() != null && !cofreDTO.itemsSolicitados().isEmpty()) {
+
+                // Buscar el cofre correspondiente en la red logística
+                Punto posicionCofre = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
+                CofreLogistico cofreDestino = encontrarCofrePorPosicion(posicionCofre);
+
+                if (cofreDestino != null) {
+                    for (ItemCantidadDTO itemSolicitado : cofreDTO.itemsSolicitados()) {
+                        // Crear el objeto Item
+                        Item item = new Item(itemSolicitado.item());
+
+                        // Buscar un cofre que ofrezca este item
+                        CofreLogistico cofreOrigen = encontrarCofreQueOfrece(item, configuracion);
+
+                        if (cofreOrigen != null) {
+                            // Crear el pedido
+                            Pedido pedido = new Pedido(
+                                    contadorPedidos++,
+                                    cofreOrigen,
+                                    cofreDestino,
+                                    item,
+                                    itemSolicitado.cantidad(),
+                                    EstadoPedido.PENDIENTE
+                            );
+
+                            pedidosGenerados.add(pedido);
+                            logger.debug("Pedido generado: {} de {} desde {} hasta {}",
+                                    itemSolicitado.cantidad(),
+                                    item.getNombre(),
+                                    cofreOrigen.getPosicion(),
+                                    cofreDestino.getPosicion());
+                        } else {
+                            logger.warn("No se encontró cofre que ofrezca el item: {}", itemSolicitado.item());
+                        }
+                    }
+                } else {
+                    logger.warn("No se encontró cofre en la posición: {}", posicionCofre);
+                }
+            }
+        }
+
+        // Agregar los pedidos generados a la red logística
+        for (Pedido pedido : pedidosGenerados) {
+            this.redLogistica.agregarPedido(pedido);
+        }
+
+        logger.info("Se generaron {} pedidos automáticamente", pedidosGenerados.size());
+    }
+
+    // Método auxiliar para encontrar un cofre por posición
+    private CofreLogistico encontrarCofrePorPosicion(Punto posicion) {
+        return this.redLogistica.getCofres().stream()
+                .filter(cofre -> cofre.getPosicion().equals(posicion))
+                .findFirst()
+                .orElse(null);
+    }
+
+    // Método auxiliar para encontrar un cofre que ofrezca un item específico
+    private CofreLogistico encontrarCofreQueOfrece(Item item, ConfiguracionSimulacionDTO configuracion) {
+        for (CofreDTO cofreDTO : configuracion.cofres()) {
+            if (cofreDTO.itemsOfrecidos() != null) {
+                boolean ofreceItem = cofreDTO.itemsOfrecidos().stream()
+                        .anyMatch(itemDTO -> itemDTO.item().equals(item.getNombre()));
+
+                if (ofreceItem) {
+                    Punto posicion = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
+                    CofreLogistico cofre = encontrarCofrePorPosicion(posicion);
+
+                    // Verificar que el cofre realmente puede ofrecer el item
+                    if (cofre != null && cofre.puedeOfrecer(item, 1)) {
+                        return cofre;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // Métodos auxiliares para cargar cada tipo de entidad
+    private void cargarRobopuerto(RobopuertoDTO rpDTO) {
+        Punto posicion = new Punto(rpDTO.posicion().x(), rpDTO.posicion().y());
+        Robopuerto robopuerto = new Robopuerto(rpDTO.id(), posicion, rpDTO.alcance(), rpDTO.tasaRecarga());
+        redLogistica.agregarRobopuerto(robopuerto);
+    }
+
+    private void cargarCofre(CofreDTO cofreDTO) {
+        Punto posicion = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
+        CofreLogistico cofre = crearCofreSegunTipo(
+                cofreDTO.id(), posicion, cofreDTO.capacidadMaxima(),
+                cofreDTO.comportamientoDefecto(), cofreDTO.tiposComportamientoPorItem());
+
+        // Cargar inventario inicial si existe
+        if (cofreDTO.inventario() != null) {
+            cofreDTO.inventario().entrySet().forEach(entry -> {
+                Item item = new Item(entry.getKey(), entry.getKey());
+                cofre.agregarItem(item, entry.getValue());
+            });
+        }
+
+        redLogistica.agregarCofre(cofre);
+    }
+
+    private void cargarRobot(RobotDTO robotDTO) {
+        Punto posicion = new Punto(robotDTO.posicion().x(), robotDTO.posicion().y());
+        Robopuerto robopuertoBase = redLogistica.getRobopuertoMasCercano(posicion);
+
+        if (robopuertoBase == null) {
+            throw new IllegalStateException("No se encontró robopuerto cercano para robot en " + posicion);
+        }
+
+        RobotLogistico robot = new RobotLogistico(
+                Integer.parseInt(robotDTO.id()),
+                posicion,
+                robopuertoBase,
+                (int) robotDTO.bateriaMaxima(),
+                robotDTO.capacidadCarga());
+
+        redLogistica.agregarRobot(robot);
+    }
+
+    private CofreLogistico crearCofreSegunTipo(String id, Punto posicion, int capacidad,
+                                               String comportamientoPorDefecto,
+                                               Map<String, String> comportamientosPorItem) {
+
         CofreLogistico cofre = CofreFactory.crearCofre(id, posicion, capacidad, comportamientoPorDefecto);
-        
+
         if (comportamientosPorItem != null) {
             for (Map.Entry<String, String> entry : comportamientosPorItem.entrySet()) {
                 Item item = new Item(entry.getKey(), entry.getKey());
-                ComportamientoCofre comportamiento = ComportamientoFactory.crear(entry.getValue());
+                // Parsear la configuración del comportamiento para obtener parámetros adicionales
+                ComportamientoCofre comportamiento = ComportamientoFactory.crearConParametros(
+                        entry.getValue(),
+                        capacidad // Pasar la capacidad del cofre como parámetro por defecto
+                );
                 cofre.setComportamiento(item, comportamiento);
             }
         }
-        
+
         return cofre;
     }
-    
+
     @Override
     public EstadoSimulacionDTO getEstadoActualSimulacion() {
         if (redLogistica == null || redLogistica.estaVacia()) {
             return new EstadoSimulacionDTO(
-                    new ArrayList<>(), 
+                    new ArrayList<>(),
                     new ArrayList<>(),
                     new ArrayList<>(),
                     new DimensionGrillaDTO(anchoGrilla, altoGrilla),
@@ -292,12 +401,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     mensajeEstado
             );
         }
-        
+
         // Convertir las entidades del dominio a DTOs
         List<RobotDTO> robotDTOs = convertirRobotsADTOs();
         List<CofreDTO> cofreDTOs = convertirCofresADTOs();
         List<RobopuertoDTO> robopuertoDTOs = convertirRobopuertosADTOs();
-        
+
         return new EstadoSimulacionDTO(
                 robotDTOs,
                 cofreDTOs,
@@ -308,19 +417,19 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 mensajeEstado
         );
     }
-    
+
     private List<RobotDTO> convertirRobotsADTOs() {
         List<RobotDTO> resultado = new ArrayList<>();
-        
+
         for (RobotLogistico robot : redLogistica.getRobotsLogisticos()) {
             Punto posicion = robot.getPosicion();
             PuntoDTO posicionDTO = new PuntoDTO(posicion.getX(), posicion.getY());
-            
+
             // Convertir carga a Map<String, Integer>
             Map<String, Integer> itemsEnCarga = new HashMap<>();
             itemsEnCarga.put(String.valueOf(robot.getId()), robot.getBateriaActual());
 
-            
+
             // Convertir la ruta si existe
             List<PuntoDTO> rutaDTO = null;
             List<Punto> ruta = robot.getRutaActual();
@@ -329,7 +438,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                         .map(p -> new PuntoDTO(p.getX(), p.getY()))
                         .toList();
             }
-            
+
             RobotDTO robotDTO = new RobotDTO(
                     String.valueOf(robot.getId()),
                     posicionDTO,
@@ -341,32 +450,32 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     robot.getEstado().toString(),
                     rutaDTO
             );
-            
+
             resultado.add(robotDTO);
         }
-        
+
         return resultado;
     }
-    
+
     private List<CofreDTO> convertirCofresADTOs() {
         List<CofreDTO> resultado = new ArrayList<>();
-        
+
         for (CofreLogistico cofre : redLogistica.getCofres()) {
             Punto posicion = cofre.getPosicion();
             PuntoDTO posicionDTO = new PuntoDTO(posicion.getX(), posicion.getY());
-            
+
             // Convertir inventario a Map<String, Integer>
             Map<String, Integer> inventarioDTO = new HashMap<>();
             for (Map.Entry<Item, Integer> entry : cofre.getInventario().getTodos().entrySet()) {
                 inventarioDTO.put(entry.getKey().getNombre(), entry.getValue());
             }
-            
+
             // Convertir comportamientos a Map<String, String>
             Map<String, String> comportamientosDTO = new HashMap<>();
             for (Item item : cofre.getInventario().getItems()) {
                 comportamientosDTO.put(item.getNombre(), cofre.getTipoComportamiento(item));
             }
-            
+
             CofreDTO cofreDTO = new CofreDTO(
                     cofre.getId(),
                     posicionDTO,
@@ -377,25 +486,25 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     cofre.getTipoComportamientoDefecto(),
                     redLogistica.esCofreAccesible(cofre) // Metodo que indica si está en zona de cobertura
             );
-            
+
             resultado.add(cofreDTO);
         }
-        
+
         return resultado;
     }
-    
+
     private List<RobopuertoDTO> convertirRobopuertosADTOs() {
         List<RobopuertoDTO> resultado = new ArrayList<>();
-        
+
         for (Robopuerto rp : redLogistica.getRobopuertos()) {
             Punto posicion = rp.getPosicion();
             PuntoDTO posicionDTO = new PuntoDTO(posicion.getX(), posicion.getY());
-            
+
             // Obtener los IDs de cofres cubiertos
             List<String> idsCofresCubiertos = redLogistica.getCofresEnCobertura(rp).stream()
                     .map(CofreLogistico::getId)
                     .toList();
-            
+
             RobopuertoDTO rpDTO = new RobopuertoDTO(
                     rp.getId(),
                     posicionDTO,
@@ -403,13 +512,13 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     rp.getTasaRecarga(),
                     idsCofresCubiertos
             );
-            
+
             resultado.add(rpDTO);
         }
-        
+
         return resultado;
     }
-    
+
     @Override
     public DetallesEntidadDTO getDetallesEntidad(String idEntidad) {
         // Buscar robot
@@ -418,26 +527,26 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             RobotDTO robotDTO = obtenerRobotDTO(robot);
             return new DetallesEntidadDTO(robotDTO);
         }
-        
+
         // Buscar cofre
         CofreLogistico cofre = redLogistica.buscarCofrePorId(idEntidad);
         if (cofre != null) {
             CofreDTO cofreDTO = obtenerCofreDTO(cofre);
             return new DetallesEntidadDTO(cofreDTO);
         }
-        
+
         // Buscar robopuerto
         Robopuerto robopuerto = redLogistica.buscarRobopuertoPorId(idEntidad);
         if (robopuerto != null) {
             RobopuertoDTO rpDTO = obtenerRobopuertoDTO(robopuerto);
             return new DetallesEntidadDTO(rpDTO);
         }
-        
+
         return null; // No se encontró la entidad
     }
-    
+
     // Métodos auxiliares para convertir entidades individuales a DTOs
-    
+
     private RobotDTO obtenerRobotDTO(RobotLogistico robot) {
         // Código similar a convertirRobotsADTOs pero para un solo robot
         // ... (implementación similar)
@@ -446,7 +555,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .findFirst()
                 .orElse(null);
     }
-    
+
     private CofreDTO obtenerCofreDTO(CofreLogistico cofre) {
         // ... (implementación similar)
         return convertirCofresADTOs().stream()
@@ -454,7 +563,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .findFirst()
                 .orElse(null);
     }
-    
+
     private RobopuertoDTO obtenerRobopuertoDTO(Robopuerto robopuerto) {
         // ... (implementación similar)
         return convertirRobopuertosADTOs().stream()
@@ -462,54 +571,257 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .findFirst()
                 .orElse(null);
     }
-    
+
     @Override
     public void registrarObservador(ObservadorEstadoSimulacion observador) {
         if (observador != null && !observadores.contains(observador)) {
             observadores.add(observador);
         }
     }
-    
+
     @Override
     public void removerObservador(ObservadorEstadoSimulacion observador) {
         observadores.remove(observador);
     }
-    
+
     private void notificarObservadores() {
         EstadoSimulacionDTO estadoActual = getEstadoActualSimulacion();
         for (ObservadorEstadoSimulacion observador : observadores) {
             observador.actualizarEstado(estadoActual);
         }
     }
-    
-    // Para fines de implementación, asumimos estas clases auxiliares
-    private static class ConfiguracionSimulacionDTO {
-        private List<RobotDTO> robots;
-        private List<CofreDTO> cofres;
-        private List<RobopuertoDTO> robopuertos;
-        private DimensionGrillaDTO dimensionGrilla;
-        private int velocidadSimulacion;
-        
-        // Getters necesarios como métodos
-        public List<RobotDTO> robots() { return robots; }
-        public List<CofreDTO> cofres() { return cofres; }
-        public List<RobopuertoDTO> robopuertos() { return robopuertos; }
-        public DimensionGrillaDTO dimensionGrilla() { return dimensionGrilla; }
-        public int velocidadSimulacion() { return velocidadSimulacion; }
-    }
-    
+
     // Clases auxiliares para crear entidades de dominio según tipo
     private static class CofreFactory {
-        public static CofreLogistico crearCofre(String id, Punto posicion, int capacidad, String tipo) {
-            // Implementación pendiente [TODO]
-            return null; // Placeholder
+
+        /**
+         * Crea un cofre logístico con el comportamiento por defecto especificado
+         *
+         * @param id El identificador único del cofre
+         * @param posicion La posición del cofre en la grilla
+         * @param capacidad La capacidad máxima del cofre
+         * @param tipoComportamiento El tipo de comportamiento por defecto
+         * @return El cofre logístico configurado
+         */
+        public static CofreLogistico crearCofre(String id, Punto posicion, int capacidad, String tipoComportamiento) {
+            Objects.requireNonNull(id, "ID del cofre no puede ser null");
+            Objects.requireNonNull(posicion, "Posición del cofre no puede ser null");
+            Objects.requireNonNull(tipoComportamiento, "Tipo de comportamiento no puede ser null");
+
+            if (capacidad <= 0) {
+                throw new IllegalArgumentException("La capacidad debe ser mayor a 0");
+            }
+
+            // Crear el cofre
+            CofreLogistico cofre = new CofreLogistico(id, posicion, capacidad);
+
+            // Configurar comportamiento por defecto con parámetros
+            ComportamientoCofre comportamientoDefecto = ComportamientoFactory.crearConParametros(
+                    tipoComportamiento,
+                    capacidad
+            );
+            cofre.setComportamientoPorDefecto(comportamientoDefecto);
+
+            return cofre;
+        }
+
+        /**
+         * Crea un cofre logístico con comportamientos específicos por item
+         *
+         * @param id El identificador único del cofre
+         * @param posicion La posición del cofre en la grilla
+         * @param capacidad La capacidad máxima del cofre
+         * @param tipoComportamientoDefecto El tipo de comportamiento por defecto
+         * @param comportamientosPorItem Mapa de comportamientos específicos por item
+         * @return El cofre logístico configurado
+         */
+        public static CofreLogistico crearCofreConComportamientos(
+                String id,
+                Punto posicion,
+                int capacidad,
+                String tipoComportamientoDefecto,
+                Map<String, String> comportamientosPorItem) {
+
+            CofreLogistico cofre = crearCofre(id, posicion, capacidad, tipoComportamientoDefecto);
+
+            // Configurar comportamientos específicos por item
+            if (comportamientosPorItem != null && !comportamientosPorItem.isEmpty()) {
+                for (Map.Entry<String, String> entry : comportamientosPorItem.entrySet()) {
+                    String nombreItem = entry.getKey();
+                    String tipoComportamiento = entry.getValue();
+
+                    Item item = new Item(nombreItem, nombreItem); // Asumiendo constructor simple
+                    ComportamientoCofre comportamiento = ComportamientoFactory.crearConParametros(
+                            tipoComportamiento,
+                            capacidad
+                    );
+                    cofre.setComportamiento(item, comportamiento);
+                }
+            }
+
+            return cofre;
         }
     }
-    
+
     private static class ComportamientoFactory {
+
+        /**
+         * Crea una instancia de comportamiento según el tipo especificado con parámetros por defecto
+         *
+         * @param tipo El tipo de comportamiento a crear
+         * @return La instancia del comportamiento correspondiente
+         * @throws IllegalArgumentException Si el tipo no es reconocido
+         */
         public static ComportamientoCofre crear(String tipo) {
-            // Implementación pendiente [TODO]
-            return null; // Placeholder
+            return crearConParametros(tipo, 100); // Capacidad por defecto
+        }
+
+        /**
+         * Crea una instancia de comportamiento según el tipo especificado con parámetros personalizados
+         *
+         * @param configuracion La configuración del comportamiento (puede incluir parámetros)
+         * @param capacidadMaximaDefecto La capacidad máxima por defecto del cofre
+         * @return La instancia del comportamiento correspondiente
+         * @throws IllegalArgumentException Si el tipo no es reconocido
+         */
+        public static ComportamientoCofre crearConParametros(String configuracion, int capacidadMaximaDefecto) {
+            Objects.requireNonNull(configuracion, "Configuración de comportamiento no puede ser null");
+
+            // Parsear la configuración para extraer tipo y parámetros
+            ConfiguracionComportamiento config = parsearConfiguracion(configuracion, capacidadMaximaDefecto);
+
+            return switch (config.tipo.toLowerCase()) {
+                case "almacenamiento", "storage" -> new ComportamientoAlmacenamiento();
+
+                case "intermediobuffer", "buffer", "intermedio" -> {
+                    int umbralMinimo = (int) config.parametros.getOrDefault("umbralMinimo",
+                            (int) (capacidadMaximaDefecto * 0.2)); // 20% por defecto
+                    int umbralMaximo = (int) config.parametros.getOrDefault("umbralMaximo",
+                            (int) (capacidadMaximaDefecto * 0.8)); // 80% por defecto
+                    yield new ComportamientoIntermedioBuffer(umbralMinimo, umbralMaximo);
+                }
+
+                case "provisionactiva", "provision_activa", "activa" -> new ComportamientoProvisionActiva();
+
+                case "provisionpasiva", "provision_pasiva", "pasiva" -> new ComportamientoProvisionPasiva();
+
+                case "solicitud", "request" -> {
+                    ComportamientoSolicitud.Prioridad prioridad = ComportamientoSolicitud.Prioridad.valueOf(
+                            config.parametros.getOrDefault("prioridad", "MEDIA").toString().toUpperCase()
+                    );
+                    int capacidadMaxima = (int) config.parametros.getOrDefault("capacidadMaxima", capacidadMaximaDefecto);
+                    yield new ComportamientoSolicitud(prioridad, capacidadMaxima);
+                }
+
+                default -> throw new IllegalArgumentException("Tipo de comportamiento no reconocido: " + config.tipo);
+            };
+        }
+
+        /**
+         * Parsea la configuración de comportamiento para extraer tipo y parámetros
+         *
+         * @param configuracion La cadena de configuración
+         * @param capacidadDefecto La capacidad por defecto
+         * @return La configuración parseada
+         */
+        private static ConfiguracionComportamiento parsearConfiguracion(String configuracion, int capacidadDefecto) {
+            Map<String, Object> parametros = new HashMap<>();
+            String tipo;
+
+            // Si la configuración contiene parámetros (formato: "tipo:param1=valor1,param2=valor2")
+            if (configuracion.contains(":")) {
+                String[] partes = configuracion.split(":", 2);
+                tipo = partes[0].trim();
+
+                if (partes.length > 1) {
+                    String[] params = partes[1].split(",");
+                    for (String param : params) {
+                        String[] keyValue = param.split("=");
+                        if (keyValue.length == 2) {
+                            String key = keyValue[0].trim();
+                            String value = keyValue[1].trim();
+
+                            // Intentar parsear como número, si no, mantener como String
+                            try {
+                                if (key.toLowerCase().contains("prioridad")) {
+                                    parametros.put(key, value.toUpperCase());
+                                } else {
+                                    parametros.put(key, Integer.parseInt(value));
+                                }
+                            } catch (NumberFormatException e) {
+                                parametros.put(key, value);
+                            }
+                        }
+                    }
+                }
+            } else {
+                tipo = configuracion.trim();
+            }
+
+            return new ConfiguracionComportamiento(tipo, parametros);
+        }
+
+        /**
+         * Obtiene todos los tipos de comportamiento disponibles
+         *
+         * @return Lista de tipos de comportamiento soportados
+         */
+        public static java.util.List<String> getTiposDisponibles() {
+            return java.util.List.of(
+                    "almacenamiento", "intermediobuffer",
+                    "provisionactiva", "provisionpasiva", "solicitud"
+            );
+        }
+
+        /**
+         * Verifica si un tipo de comportamiento es válido
+         *
+         * @param configuracion La configuración a verificar
+         * @return true si es válido, false en caso contrario
+         */
+        public static boolean esTipoValido(String configuracion) {
+            if (configuracion == null) return false;
+
+            String tipo = configuracion.contains(":") ?
+                    configuracion.split(":", 2)[0].trim() : configuracion.trim();
+
+            return switch (tipo.toLowerCase()) {
+                case "almacenamiento", "storage",
+                     "cofre", "general",
+                     "intermediobuffer", "buffer", "intermedio",
+                     "provisionactiva", "provision_activa", "activa",
+                     "provisionpasiva", "provision_pasiva", "pasiva",
+                     "solicitud", "request" -> true;
+                default -> false;
+            };
+        }
+
+        /**
+         * Genera una configuración de ejemplo para cada tipo de comportamiento
+         *
+         * @return Mapa con ejemplos de configuración
+         */
+        public static Map<String, String> getEjemplosConfiguracion() {
+            Map<String, String> ejemplos = new HashMap<>();
+            ejemplos.put("almacenamiento", "almacenamiento");
+            ejemplos.put("intermediobuffer", "intermediobuffer:umbralMinimo=10,umbralMaximo=40");
+            ejemplos.put("provisionactiva", "provisionactiva");
+            ejemplos.put("provisionpasiva", "provisionpasiva");
+            ejemplos.put("solicitud", "solicitud:prioridad=ALTA,capacidadMaxima=50");
+            return ejemplos;
+        }
+
+        /**
+         * Clase interna para representar la configuración parseada de un comportamiento
+         */
+        private static class ConfiguracionComportamiento {
+            final String tipo;
+            final Map<String, Object> parametros;
+
+            public ConfiguracionComportamiento(String tipo, Map<String, Object> parametros) {
+                this.tipo = tipo;
+                this.parametros = parametros != null ? parametros : new HashMap<>();
+            }
         }
     }
 }

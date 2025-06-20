@@ -27,7 +27,7 @@ public class MainApplication extends Application {
     public void start(Stage primaryStage) {
         try {
             // Cargar el FXML
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/alphaone/logisticaRobots/ui/views/MainSimulacionView.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/MainSimulacionView.fxml"));
             Parent root = loader.load();
             
             // Obtener el controlador
@@ -39,7 +39,7 @@ public class MainApplication extends Application {
             
             // Configurar y mostrar la escena
             Scene scene = new Scene(root, 1200, 800);
-            scene.getStylesheets().add(getClass().getResource("/com/alphaone/logisticaRobots/ui/css/styles.css").toExternalForm());
+            scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
             
             primaryStage.setTitle("Sistema Logístico Automatizado");
             
