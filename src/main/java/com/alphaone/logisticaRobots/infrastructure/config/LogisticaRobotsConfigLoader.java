@@ -211,7 +211,7 @@ public class LogisticaRobotsConfigLoader {
                     }
                 }
 
-                // Mapear comportamientos por item
+                // TODO: Revisar. Mapear comportamientos por item
                 Map<String, String> comportamientosPorItem = new HashMap<>();
                 if (cofreNode.has("comportamientosPorItem") && cofreNode.get("comportamientosPorItem").isObject()) {
                     JsonNode comportamientosNode = cofreNode.get("comportamientosPorItem");

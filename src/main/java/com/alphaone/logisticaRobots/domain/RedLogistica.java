@@ -9,27 +9,12 @@ import java.util.stream.Collectors;
 
 public class RedLogistica { // es el universo donde se componen las cosas
 
-    // TODO:
-    //  Esto?? Por qué es un mapa y no un SET? Por ahora lo comento y lo transformo en Set
-    // private final Map<Robopuerto,Integer> robopuertos; //el robopuerto dentro va a contener a los robots y los cofres
     private Set<Robopuerto> robopuertos;
     private Set<CofreLogistico> cofres;
     private Set<RobotLogistico> robotsLogisticos;
     private List<Pedido> pedidos;
-
-    // TODO:
-    //  Cómo podríamos tener más de una grilla espacial? Yo me imagino la grilla espacial
-    //  como el mapa completo. No le veo sentido a tener más de una grilla.
-    //  Lo comento y hago que sea una unica grilla espacial.
-    // private final Map<GrillaEspacial,Integer> grillasEspaciales;
     private final GrillaEspacial grillaEspacial;
-
-    // TODO:
-    //  Si el planificador va aca, tenemos que refactorizar el Planificador
-    //  Podemos tener este objeto planificador que es general de la RedLogistica
-    //  y que luego, le pasemos una ruta y planifique el mejor camino. Para ello,
-    //  tenemos que hacer que Planificador no tenga una lista de pedidos como atr.
-    private final Planificador planificador; // el que va a implementar dijkstra y las planificaciones
+    private final Planificador planificador;
 
     /**
      * Constructor por defecto que inicializa una red logística vacía.
@@ -113,6 +98,9 @@ public class RedLogistica { // es el universo donde se componen las cosas
     }
 
     /**
+     * TODO:
+     *  Revisar el funcionamiento general del metodo y evaluar pasarlo a
+     *  Planificador ya que no es responsabilidad de la red logistica el hecho de asignar un pedido a un robot
      * Simula un ciclo de movimiento de todos los robots de la red.
      * Procesa los pedidos pendientes y mueve los robots según sea necesario.
      */
@@ -172,6 +160,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         }
 
         // Asignar pedidos a robots disponibles
+        // TODO: Evaluar prioridad.
         for (Pedido pedido : new ArrayList<>(pedidos)) {
             if (pedido.getEstado() == Pedido.EstadoPedido.NUEVO) {
                 // Buscar un robot disponible
@@ -206,6 +195,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
                 .anyMatch(p -> p.getEstado() == Pedido.EstadoPedido.NUEVO || p.getEstado() == Pedido.EstadoPedido.EN_PROCESO);
 
         // Verificar si hay robots en movimiento
+        // TODO: Validar que los estados del robot sean correctos para validar si es un estado estable o no.
         boolean robotsEnMovimiento = robotsLogisticos.stream()
                 .anyMatch(r -> r.getEstado() == EstadoRobot.EN_MISION);
 
@@ -220,7 +210,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
      * @return boolean
      */
     public boolean esCofreAccesible(CofreLogistico cofre) {
-        // Verificar si el cofre está dentro de la grilla espacial
+        // TODO: REvisar esta validacion, creo que no va. Verificar si el cofre está dentro de la grilla espacial
         if (!grillaEspacial.dentroDeGrilla(cofre.getPosicion())) {
             return false;
         }

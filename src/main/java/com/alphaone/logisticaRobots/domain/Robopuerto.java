@@ -12,8 +12,6 @@ public class Robopuerto implements Ubicable {
     private final double alcance;
     private final int tasaRecarga;  // Cantidad de células que recarga por ciclo
 
-    // TODO: Nos hace falta tener los asociados? Creo que es mejor manejarlo con alcance
-    private final List<RobotLogistico> robotsAsociados;
     private final List<CofreLogistico> cofresConectados;
 
     public Robopuerto(String id, Punto posicion, double alcance, int tasaRecarga) {
@@ -22,7 +20,6 @@ public class Robopuerto implements Ubicable {
         this.alcance = validarDistancia(alcance);
         this.tasaRecarga = validarTasaRecarga(tasaRecarga);
         this.cofresConectados = new ArrayList<>();
-        this.robotsAsociados = new ArrayList<>();
     }
 
     public String getId() {
@@ -35,10 +32,6 @@ public class Robopuerto implements Ubicable {
 
     public int getTasaRecarga() {
         return tasaRecarga;
-    }
-
-    public List<RobotLogistico> getRobotsAsociados() {
-        return robotsAsociados;
     }
 
     public List<CofreLogistico> getCofresConectados() {
@@ -87,18 +80,6 @@ public class Robopuerto implements Ubicable {
     }
 
     //Manejo de robots:
-
-    public void conectarRobot(RobotLogistico robot) {
-        if(!robotsAsociados.contains(robot)) {
-            robotsAsociados.add(robot);
-        }
-    }
-
-    public void desconectarRobot(RobotLogistico robot) {
-        if (robotsAsociados.contains(robot)) {
-            robotsAsociados.remove(robot);
-        }
-    }
 
     private int validarTasaRecarga(int tasaRecarga) {
         if (tasaRecarga <= 0) {

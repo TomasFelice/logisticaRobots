@@ -43,7 +43,8 @@ public class Planificador { //lo está haciendo tomi
         for (Nodo origen : grafo.getNodos()) {
             for (Nodo destino : grafo.getNodos()) {
                 if (origen != destino) {
-                    // Verificar si están en alcance
+                    // Verificar si están en alcance.
+                    // TODO: Revisar esta validacion tomando como premisa que debe verificar si un nodo tiene conexion posbile con otro
                     if (estanConectados(origen.getNodo(), destino.getNodo())) {
                         double distancia = origen.getNodo().distanciaHacia(destino.getNodo());
                         double peso = distancia * factorConsumo;
@@ -55,6 +56,8 @@ public class Planificador { //lo está haciendo tomi
     }
 
     /**
+     * TODO: Corregir este método, no hace lo que dice.
+     *  Analizar la posibilidad de usar un Warshall para esto, dado que la consulta será O(1) una vez que tenemos armada la matriz
      * Determina si dos puntos están conectados en la red logística.
      * Dos puntos están conectados si están dentro de la grilla espacial
      * y la distancia entre ellos es razonable para que un robot pueda recorrerla.
@@ -64,7 +67,7 @@ public class Planificador { //lo está haciendo tomi
      * @return true si los puntos están conectados, false en caso contrario
      */
     private boolean estanConectados(Punto origen, Punto destino) {
-        // Verificar que ambos puntos estén dentro de la grilla espacial
+        // TODO: Eliminar esta validacion. La grilla es unica. Verificar que ambos puntos estén dentro de la grilla espacial
         if (!grillaEspacial.dentroDeGrilla(origen) || !grillaEspacial.dentroDeGrilla(destino)) {
             return false;
         }

@@ -226,6 +226,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         velocidadSimulacion = configuracion.velocidadSimulacion() > 0 ?
                 configuracion.velocidadSimulacion() : 1000;
 
+        // TODO: Revisar si hay que hacer algo con el planificador aca.
+
         // Actualizar estado
         this.archivoConfigActual = archivoConfig;
         cicloActual = 0;
@@ -237,6 +239,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     // Método auxiliar para cargar pedidos desde la configuración
+    // TODO: Revisar que esto este andando bien, no estoy seguro que funcione la logica de comportamientos
+    // TODO: Validar capacidad de cofres y robots
     private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion) {
         if (configuracion.cofres() == null || configuracion.cofres().isEmpty()) {
             return;
@@ -287,6 +291,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     }
 
                     // Determinar la cantidad a solicitar (por simplicidad, usamos 1)
+                    // TODO: Validar la cantidad de items que muevo de un cofre a otro
                     int cantidad = 1;
 
                     // Crear el pedido
