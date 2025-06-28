@@ -47,10 +47,11 @@ public interface ServicioSimulacion {
 
     /**
      * Obtiene detalles específicos de una entidad de la simulación (robot, cofre, robopuerto).
-     * @param idEntidad Identificador único de la entidad.
+     * @param tipoEntidad Tipo de la entidad ("ROBOT", "COFRE", "ROBOPUERTO").
+     * @param idEntidad Identificador único de la entidad dentro de su tipo.
      * @return Un DTO con los detalles de la entidad, o null si no se encuentra.
      */
-    DetallesEntidadDTO getDetallesEntidad(String idEntidad);
+    DetallesEntidadDTO getDetallesEntidad(String tipoEntidad, String idEntidad);
 
     /**
      * Registra un observador que será notificado de los cambios en el estado de la simulación.

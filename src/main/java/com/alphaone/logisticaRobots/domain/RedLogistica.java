@@ -278,7 +278,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         }
         
         return robotsLogisticos.stream()
-                .filter(robot -> idRobot.equals(robot.getId()))
+                .filter(robot -> idRobot.equals(String.valueOf(robot.getId())))
                 .findFirst()
                 .orElse(null);
     }

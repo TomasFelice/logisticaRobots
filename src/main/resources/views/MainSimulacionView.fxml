@@ -54,11 +54,9 @@
     </top>
     
     <center>
-        <StackPane>
-            <ScrollPane pannable="true" fitToWidth="true" fitToHeight="true">
-                <Canvas fx:id="canvasGrilla" width="800" height="600"/>
-            </ScrollPane>
-        </StackPane>
+        <ScrollPane pannable="true" fitToWidth="true" fitToHeight="true">
+            <Canvas fx:id="canvasGrilla" width="800" height="600"/>
+        </ScrollPane>
     </center>
     
     <right>

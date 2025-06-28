@@ -247,10 +247,13 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             this.ultimosCofres = nuevoEstado.cofres();
             this.ultimosRobopuertos = nuevoEstado.robopuertos();
 
-            if (dimensionGrilla != null) {
+                if (dimensionGrilla != null) {
                 canvasGrilla.setWidth(dimensionGrilla.ancho() * ESCALA_DIBUJO);
                 canvasGrilla.setHeight(dimensionGrilla.alto() * ESCALA_DIBUJO);
-
+                // Forzar layout para que el ScrollPane actualice su viewport
+                if (canvasGrilla.getParent() != null) {
+                    canvasGrilla.getParent().layout();
+                }
                 // Centrar el mapa cuando se carga la configuración
                 if (offsetX == 0 && offsetY == 0) {
                     // Solo centrar si no se ha movido manualmente
@@ -590,58 +593,11 @@ private void dibujarRobot(RobotDTO robot) {
         double transformedX = (clickX - offsetX) / escalaZoom;
         double transformedY = (clickY - offsetY) / escalaZoom;
 
-        // Buscar la entidad más cercana al clic (simplificado)
-        String idEntidadSeleccionada = null;
-        double minDistanciaSq = Double.MAX_VALUE;
+        // Buscar la entidad más cercana al clic
+        EntidadSeleccionada entidadSeleccionada = encontrarEntidadEnPosicion(transformedX, transformedY);
 
-        // Chequear robots
-        if (ultimosRobots != null) {
-            for (RobotDTO robot : ultimosRobots) {
-                double rX = robot.posicion().x() * ESCALA_DIBUJO;
-                double rY = robot.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(transformedX - rX, 2) + Math.pow(transformedY - rY, 2);
-                // Ajustar el área de clic según el zoom
-                double areaClickRobot = Math.pow(RADIO_ROBOT * 1.5, 2);
-                if (distSq < areaClickRobot && distSq < minDistanciaSq) {
-                    minDistanciaSq = distSq;
-                    idEntidadSeleccionada = robot.id();
-                }
-            }
-        }
-
-        // Chequear cofres
-        if (ultimosCofres != null) {
-            for (CofreDTO cofre : ultimosCofres) {
-                double cX = cofre.posicion().x() * ESCALA_DIBUJO;
-                double cY = cofre.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(transformedX - cX, 2) + Math.pow(transformedY - cY, 2);
-                // Ajustar el área de clic según el zoom
-                double areaClickCofre = Math.pow(TAMANO_COFRE, 2);
-                if (distSq < areaClickCofre && distSq < minDistanciaSq) {
-                    minDistanciaSq = distSq;
-                    idEntidadSeleccionada = cofre.id();
-                }
-            }
-        }
-
-        // Chequear robopuertos
-        if (ultimosRobopuertos != null) {
-            for (RobopuertoDTO rp : ultimosRobopuertos) {
-                double rpX = rp.posicion().x() * ESCALA_DIBUJO;
-                double rpY = rp.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(transformedX - rpX, 2) + Math.pow(transformedY - rpY, 2);
-                // Ajustar el área de clic según el zoom
-                double areaClickRobopuerto = Math.pow(TAMANO_ROBOPUERTO, 2);
-                if (distSq < areaClickRobopuerto && distSq < minDistanciaSq) {
-                    minDistanciaSq = distSq;
-                    idEntidadSeleccionada = rp.id();
-                }
-            }
-        }
-
-
-        if (idEntidadSeleccionada != null) {
-            DetallesEntidadDTO detalles = servicioSimulacion.getDetallesEntidad(idEntidadSeleccionada);
+        if (entidadSeleccionada != null) {
+            DetallesEntidadDTO detalles = servicioSimulacion.getDetallesEntidad(entidadSeleccionada.tipo(), entidadSeleccionada.id());
             mostrarDetallesEntidad(detalles);
         } else {
             // Mostrar las coordenadas transformadas (en el espacio de la grilla)
@@ -652,6 +608,86 @@ private void dibujarRobot(RobotDTO robot) {
                 String.format("%.1f", grillaY) + ") - Zoom: " + 
                 String.format("%.1f", escalaZoom) + "x");
         }
+    }
+
+    /**
+     * Clase auxiliar para representar una entidad seleccionada
+     */
+    private static class EntidadSeleccionada {
+        private final String id;
+        private final String tipo;
+        private final double distancia;
+
+        public EntidadSeleccionada(String id, String tipo, double distancia) {
+            this.id = id;
+            this.tipo = tipo;
+            this.distancia = distancia;
+        }
+
+        public String id() { return id; }
+        public String tipo() { return tipo; }
+        public double distancia() { return distancia; }
+    }
+
+    /**
+     * Encuentra la entidad más cercana a una posición dada
+     */
+    private EntidadSeleccionada encontrarEntidadEnPosicion(double x, double y) {
+        EntidadSeleccionada entidadMasCercana = null;
+        double minDistancia = Double.MAX_VALUE;
+
+        // Buscar robots
+        if (ultimosRobots != null) {
+            for (RobotDTO robot : ultimosRobots) {
+                double rX = robot.posicion().x() * ESCALA_DIBUJO;
+                double rY = robot.posicion().y() * ESCALA_DIBUJO;
+                double distancia = Math.sqrt(Math.pow(x - rX, 2) + Math.pow(y - rY, 2));
+                
+                // Área de clic para robots (radio del robot + margen)
+                double areaClickRobot = RADIO_ROBOT * 1.5;
+                
+                if (distancia < areaClickRobot && distancia < minDistancia) {
+                    minDistancia = distancia;
+                    entidadMasCercana = new EntidadSeleccionada(robot.id(), "ROBOT", distancia);
+                }
+            }
+        }
+
+        // Buscar cofres
+        if (ultimosCofres != null) {
+            for (CofreDTO cofre : ultimosCofres) {
+                double cX = cofre.posicion().x() * ESCALA_DIBUJO;
+                double cY = cofre.posicion().y() * ESCALA_DIBUJO;
+                double distancia = Math.sqrt(Math.pow(x - cX, 2) + Math.pow(y - cY, 2));
+                
+                // Área de clic para cofres (mitad del tamaño del cofre)
+                double areaClickCofre = TAMANO_COFRE / 2;
+                
+                if (distancia < areaClickCofre && distancia < minDistancia) {
+                    minDistancia = distancia;
+                    entidadMasCercana = new EntidadSeleccionada(cofre.id(), "COFRE", distancia);
+                }
+            }
+        }
+
+        // Buscar robopuertos
+        if (ultimosRobopuertos != null) {
+            for (RobopuertoDTO rp : ultimosRobopuertos) {
+                double rpX = rp.posicion().x() * ESCALA_DIBUJO;
+                double rpY = rp.posicion().y() * ESCALA_DIBUJO;
+                double distancia = Math.sqrt(Math.pow(x - rpX, 2) + Math.pow(y - rpY, 2));
+                
+                // Área de clic para robopuertos (mitad del tamaño del robopuerto)
+                double areaClickRobopuerto = TAMANO_ROBOPUERTO / 2;
+                
+                if (distancia < areaClickRobopuerto && distancia < minDistancia) {
+                    minDistancia = distancia;
+                    entidadMasCercana = new EntidadSeleccionada(rp.id(), "ROBOPUERTO", distancia);
+                }
+            }
+        }
+
+        return entidadMasCercana;
     }
 
     /**

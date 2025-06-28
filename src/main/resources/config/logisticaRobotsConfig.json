@@ -1,8 +1,8 @@
 {
   "grilla": {
     "dimensiones": {
-      "ancho": 10,
-      "alto": 10
+      "ancho": 30,
+      "alto": 30
     }
   },
   "factorConsumo": 1.2,
@@ -10,8 +10,8 @@
     {
       "id": 1,
       "posicion": {
-        "x": 2,
-        "y": 2
+        "x": 4,
+        "y": 4
       },
       "alcance": 4,
       "cargasSimultaneas": 2,
@@ -20,8 +20,8 @@
     {
       "id": 2,
       "posicion": {
-        "x": 7,
-        "y": 7
+        "x": 9,
+        "y": 9
       },
       "alcance": 3,
       "cargasSimultaneas": 1,
@@ -58,8 +58,8 @@
   "cofres": [
     {
       "posicion": {
-        "x": 0,
-        "y": 0
+        "x": 2,
+        "y": 2
       },
       "capacidadMaxima": 20,
       "comportamientoDefecto": "comportamiento_almacenamiento",
@@ -76,8 +76,8 @@
     },
     {
       "posicion": {
-        "x": 9,
-        "y": 9
+        "x": 11,
+        "y": 11
       },
       "capacidadMaxima": 15,
       "comportamientoDefecto": "comportamiento_almacenamiento",

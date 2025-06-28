@@ -530,28 +530,31 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     @Override
-    public DetallesEntidadDTO getDetallesEntidad(String idEntidad) {
-        // Buscar robot
-        RobotLogistico robot = redLogistica.buscarRobotPorId(idEntidad);
-        if (robot != null) {
-            RobotDTO robotDTO = obtenerRobotDTO(robot);
-            return new DetallesEntidadDTO(robotDTO);
+    public DetallesEntidadDTO getDetallesEntidad(String tipoEntidad, String idEntidad) {
+        if (tipoEntidad == null || idEntidad == null) return null;
+        switch (tipoEntidad) {
+            case "ROBOT" -> {
+                RobotLogistico robot = redLogistica.buscarRobotPorId(idEntidad);
+                if (robot != null) {
+                    RobotDTO robotDTO = obtenerRobotDTO(robot);
+                    return new DetallesEntidadDTO(robotDTO);
+                }
+            }
+            case "COFRE" -> {
+                CofreLogistico cofre = redLogistica.buscarCofrePorId(idEntidad);
+                if (cofre != null) {
+                    CofreDTO cofreDTO = obtenerCofreDTO(cofre);
+                    return new DetallesEntidadDTO(cofreDTO);
+                }
+            }
+            case "ROBOPUERTO" -> {
+                Robopuerto robopuerto = redLogistica.buscarRobopuertoPorId(idEntidad);
+                if (robopuerto != null) {
+                    RobopuertoDTO rpDTO = obtenerRobopuertoDTO(robopuerto);
+                    return new DetallesEntidadDTO(rpDTO);
+                }
+            }
         }
-
-        // Buscar cofre
-        CofreLogistico cofre = redLogistica.buscarCofrePorId(idEntidad);
-        if (cofre != null) {
-            CofreDTO cofreDTO = obtenerCofreDTO(cofre);
-            return new DetallesEntidadDTO(cofreDTO);
-        }
-
-        // Buscar robopuerto
-        Robopuerto robopuerto = redLogistica.buscarRobopuertoPorId(idEntidad);
-        if (robopuerto != null) {
-            RobopuertoDTO rpDTO = obtenerRobopuertoDTO(robopuerto);
-            return new DetallesEntidadDTO(rpDTO);
-        }
-
         return null; // No se encontró la entidad
     }
 
