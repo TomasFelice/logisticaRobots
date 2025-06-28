@@ -11,6 +11,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 
@@ -22,6 +23,7 @@ import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
 import javafx.scene.shape.ArcType;
 import javafx.scene.text.Font;
+import javafx.scene.transform.Affine;
 
 public class MainSimulacionController implements ObservadorEstadoSimulacion {
 
@@ -55,10 +57,18 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
     private List<RobopuertoDTO> ultimosRobopuertos;
 
     // Escala para dibujar en el canvas (píxeles por unidad de grilla)
-    private static final double ESCALA_DIBUJO = 20.0;
+    private static final double ESCALA_DIBUJO = 40.0;
     private static final double RADIO_ROBOT = 5.0;
     private static final double TAMANO_COFRE = 10.0;
-    private static final double TAMANO_ROBOPUERTO = 8.0;
+    private static final double TAMANO_ROBOPUERTO = 20.0;
+
+    // Variables para panning y zooming
+    private double offsetX = 0;
+    private double offsetY = 0;
+    private double escalaZoom = 1.0;
+    private double lastMouseX;
+    private double lastMouseY;
+    private boolean isPanning = false;
 
 
     /**
@@ -66,30 +76,51 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
      */
     @FXML
     public void initialize() {
-        // Aquí se debería instanciar o inyectar el servicioSimulacion.
-        // Por ejemplo, si tienes una clase factoría o un singleton:
-        // this.servicioSimulacion = FabricaServicios.getServicioSimulacion();
-        // O si se pasa desde la clase principal de la aplicación:
-        // (Este método es para configuración, la inyección real se haría antes)
 
-        // Placeholder para la instanciación del servicio (esto debería manejarse mejor)
-        if (this.servicioSimulacion == null) {
-            System.err.println("ServicioSimulacion no ha sido inyectado/instanciado. Funcionalidad limitada.");
-            // Podrías deshabilitar botones aquí o mostrar un error
-            deshabilitarControles(true);
-        } else {
+        // En JavaFX, initialize se llama antes de que MainApplication pueda inyectar el servicio
+        // Por lo tanto, deshabilitamos los controles inicialmente y esperamos a que setServicioSimulacion sea llamado
+        deshabilitarControles(true);
+
+        // Si el servicio ya está disponible (poco probable en este punto), lo configuramos
+        if (this.servicioSimulacion != null) {
             this.servicioSimulacion.registrarObservador(this);
-            // Solicitar estado inicial si es necesario, o esperar a la carga de config.
-            // EstadoSimulacionDTO estadoInicial = servicioSimulacion.getEstadoActualSimulacion();
-            // if (estadoInicial != null) {
-            //     actualizarEstado(estadoInicial);
-            // }
-            deshabilitarControles(false); // Habilita si el servicio está listo
-            botonPausar.setDisable(true); // Inicialmente no se puede pausar si no está iniciada
+            deshabilitarControles(false);
+            botonPausar.setDisable(true);
         }
 
         // Configurar el canvas para clics (selección de entidades)
         canvasGrilla.setOnMouseClicked(this::handleCanvasClick);
+
+        // Configurar eventos para panning (arrastrar el mapa)
+        canvasGrilla.setOnMousePressed(event -> {
+            lastMouseX = event.getX();
+            lastMouseY = event.getY();
+            isPanning = true;
+        });
+
+        canvasGrilla.setOnMouseDragged(event -> {
+            if (isPanning) {
+                double deltaX = event.getX() - lastMouseX;
+                double deltaY = event.getY() - lastMouseY;
+                offsetX += deltaX;
+                offsetY += deltaY;
+                lastMouseX = event.getX();
+                lastMouseY = event.getY();
+
+                // Redibujar el canvas con la nueva posición
+                limpiarCanvas();
+                if (dimensionGrilla != null) {
+                    dibujarEstado(servicioSimulacion.getEstadoActualSimulacion());
+                }
+            }
+        });
+
+        canvasGrilla.setOnMouseReleased(event -> {
+            isPanning = false;
+        });
+
+        // Configurar eventos para zooming (rueda del ratón)
+        canvasGrilla.setOnScroll(this::handleScroll);
 
         // Inicialmente, no hay detalles para mostrar
         textAreaDetallesEntidad.setText("Seleccione una entidad en la grilla para ver sus detalles.");
@@ -108,7 +139,6 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             this.servicioSimulacion.registrarObservador(this);
             deshabilitarControles(false);
             botonPausar.setDisable(true);
-            // Opcionalmente, cargar estado inicial
             actualizarEstado(this.servicioSimulacion.getEstadoActualSimulacion());
         }
     }
@@ -118,7 +148,6 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         // botonPausar se maneja según el estado de la simulación
         botonResetear.setDisable(deshabilitar);
         botonAvanzarCiclo.setDisable(deshabilitar);
-        // botonCargarConfig usualmente siempre está habilitado o se habilita si el servicio existe
         botonCargarConfig.setDisable(false); // Asumimos que cargar config siempre es una opción
     }
 
@@ -221,6 +250,20 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             if (dimensionGrilla != null) {
                 canvasGrilla.setWidth(dimensionGrilla.ancho() * ESCALA_DIBUJO);
                 canvasGrilla.setHeight(dimensionGrilla.alto() * ESCALA_DIBUJO);
+
+                // Centrar el mapa cuando se carga la configuración
+                if (offsetX == 0 && offsetY == 0) {
+                    // Solo centrar si no se ha movido manualmente
+                    double canvasParentWidth = canvasGrilla.getParent().getBoundsInLocal().getWidth();
+                    double canvasParentHeight = canvasGrilla.getParent().getBoundsInLocal().getHeight();
+
+                    // Calcular el offset para centrar
+                    offsetX = (canvasParentWidth - canvasGrilla.getWidth()) / 2;
+                    offsetY = (canvasParentHeight - canvasGrilla.getHeight()) / 2;
+
+                    // Reiniciar zoom
+                    escalaZoom = 1.0;
+                }
             }
             limpiarCanvas();
             dibujarEstado(nuevoEstado);
@@ -270,11 +313,19 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
 
     private void limpiarCanvas() {
         GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
+
+        // Limpiar todo el canvas
         gc.clearRect(0, 0, canvasGrilla.getWidth(), canvasGrilla.getHeight());
+
+        // Aplicar transformaciones (panning y zooming)
+        gc.save();
+        gc.transform(new Affine(escalaZoom, 0, offsetX, 0, escalaZoom, offsetY));
+
         // Opcional: Dibujar una grilla de fondo
         if (dimensionGrilla != null) {
             gc.setStroke(Color.LIGHTGRAY);
-            gc.setLineWidth(0.5);
+            gc.setLineWidth(0.5 / escalaZoom); // Ajustar el ancho de línea según el zoom
+
             for (int x = 0; x <= dimensionGrilla.ancho(); x++) {
                 gc.strokeLine(x * ESCALA_DIBUJO, 0, x * ESCALA_DIBUJO, dimensionGrilla.alto() * ESCALA_DIBUJO);
             }
@@ -282,9 +333,18 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 gc.strokeLine(0, y * ESCALA_DIBUJO, dimensionGrilla.ancho() * ESCALA_DIBUJO, y * ESCALA_DIBUJO);
             }
         }
+
+        // Restaurar el contexto gráfico para que las transformaciones no afecten a otros dibujos
+        gc.restore();
     }
 
     private void dibujarEstado(EstadoSimulacionDTO estado) {
+        GraphicsContext gc = canvasGrilla.getGraphicsContext2D();
+
+        // Aplicar transformaciones (panning y zooming)
+        gc.save();
+        gc.transform(new Affine(escalaZoom, 0, offsetX, 0, escalaZoom, offsetY));
+
         if (estado.robopuertos() != null) {
             estado.robopuertos().forEach(this::dibujarRobopuerto);
         }
@@ -294,6 +354,9 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         if (estado.robots() != null) {
             estado.robots().forEach(this::dibujarRobot);
         }
+
+        // Restaurar el contexto gráfico
+        gc.restore();
     }
 
 // Reemplazar los métodos de dibujo en MainSimulacionController con estos:
@@ -313,10 +376,10 @@ private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
             new Stop(0, Color.rgb(100, 149, 237, 0.2)), // Azul claro en el centro
             new Stop(1, Color.rgb(100, 149, 237, 0.05)) // Más transparente en los bordes
     );
-    
+
     gc.setFill(gradient);
     gc.fillOval(x - alcance, y - alcance, alcance * 2, alcance * 2);
-    
+
     // Borde de la zona de cobertura
     gc.setStroke(Color.CORNFLOWERBLUE);
     gc.setLineWidth(0.8);
@@ -327,7 +390,7 @@ private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
     // Dibujar robopuerto como estructura octagonal
     double size = TAMANO_ROBOPUERTO;
     double s = size * 0.4; // Factor para los lados del octágono
-    
+
     gc.setFill(Color.DARKBLUE);
     double[] xPoints = {
         x, x+s, x+size/2, x+s, x, x-s, x-size/2, x-s
@@ -336,18 +399,18 @@ private void dibujarRobopuerto(RobopuertoDTO robopuerto) {
         y-size/2, y-s, y, y+s, y+size/2, y+s, y, y-s
     };
     gc.fillPolygon(xPoints, yPoints, 8);
-    
+
     // Añadir un efecto de brillo
     gc.setFill(Color.rgb(255, 255, 255, 0.3));
     gc.fillOval(x-size/4, y-size/4, size/2, size/2);
-    
+
     // Añadir identificador si hay espacio
     if (size > 12) {
         gc.setFill(Color.WHITE);
         gc.setFont(new Font("Arial", 10));
         gc.fillText("RP", x - 7, y + 4);
     }
-    
+
     gc.restore();
 }
 
@@ -360,7 +423,7 @@ private void dibujarCofre(CofreDTO cofre) {
     // Determinar color base según accesibilidad y porcentaje de llenado
     Color colorBase;
     double porcentajeLlenado = (double) cofre.capacidadActual() / cofre.capacidadMaxima();
-    
+
     if (!cofre.esAccesible()) {
         colorBase = Color.GRAY; // Cofre inaccesible
     } else {
@@ -369,30 +432,30 @@ private void dibujarCofre(CofreDTO cofre) {
         double g = Math.min(1.0, (1 - porcentajeLlenado) * 2); // Menos verde mientras más lleno
         colorBase = Color.color(r * 0.8, g * 0.6, 0.2); // Tonos tierra/cofre
     }
-    
+
     // Sombra
     gc.setFill(Color.rgb(0, 0, 0, 0.2));
     gc.fillRect(x - size/2 + 2, y - size/2 + 2, size, size);
-    
+
     // Cuerpo principal del cofre
     gc.setFill(colorBase);
     gc.fillRect(x - size/2, y - size/2, size, size);
-    
+
     // Borde del cofre
     gc.setStroke(Color.BLACK);
     gc.setLineWidth(1);
     gc.strokeRect(x - size/2, y - size/2, size, size);
-    
+
     // Dibuja la "tapa" del cofre
     gc.setFill(colorBase.brighter());
     gc.fillRect(x - size/2, y - size/2, size, size/4);
     gc.setStroke(Color.BLACK);
     gc.strokeRect(x - size/2, y - size/2, size, size/4);
-    
+
     // Cerradura/candado
     gc.setFill(Color.DARKGOLDENROD);
     gc.fillOval(x - 2, y - size/2 + size/8 - 2, 4, 4);
-    
+
     // Indicador de tipo de comportamiento (primera letra del comportamiento principal)
     if (!cofre.inventario().isEmpty() || cofre.comportamientoDefecto() != null) {
         String comportamiento = cofre.comportamientoDefecto();
@@ -402,18 +465,18 @@ private void dibujarCofre(CofreDTO cofre) {
             gc.fillText(comportamiento.substring(0, 1).toUpperCase(), x - 3, y + 3);
         }
     }
-    
+
     // Indicador de llenado (barra de progreso)
     if (porcentajeLlenado > 0) {
         double barraAncho = size * 0.8;
         double barraAlto = 3;
         double barraPosX = x - barraAncho/2;
         double barraPosY = y + size/2 + 4;
-        
+
         // Fondo de la barra
         gc.setFill(Color.rgb(200, 200, 200, 0.8));
         gc.fillRect(barraPosX, barraPosY, barraAncho, barraAlto);
-        
+
         // Barra de progreso
         Color colorBarra = porcentajeLlenado > 0.8 ? Color.RED :
                            porcentajeLlenado > 0.6 ? Color.ORANGE :
@@ -432,7 +495,7 @@ private void dibujarRobot(RobotDTO robot) {
     if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
         gc.setStroke(Color.LIGHTGREEN);
         gc.setLineWidth(1.5);
-        
+
         // Dibujar líneas de la ruta
         PuntoDTO pAnterior = robot.posicion();
         for (PuntoDTO pSiguiente : robot.rutaActual()) {
@@ -446,7 +509,7 @@ private void dibujarRobot(RobotDTO robot) {
             pAnterior = pSiguiente;
         }
     }
-    
+
     // Determinar color basado en estado
     Color colorRobot;
     switch (robot.estadoActual()) {
@@ -465,24 +528,24 @@ private void dibujarRobot(RobotDTO robot) {
         default: // ACTIVO u otros
             colorRobot = Color.LIMEGREEN;
     }
-    
+
     // Calcular el porcentaje de batería para el degradado
     double porcentajeBateria = robot.nivelBateria() / robot.bateriaMaxima();
-    
+
     // Base del robot (círculo)
     double radio = RADIO_ROBOT;
-    
+
     // Sombra
     gc.setFill(Color.rgb(0, 0, 0, 0.2));
     gc.fillOval(x - radio + 1, y - radio + 1, radio * 2, radio * 2);
-    
+
     // Cuerpo del robot
     gc.setFill(colorRobot);
     gc.fillOval(x - radio, y - radio, radio * 2, radio * 2);
     gc.setStroke(colorRobot.darker());
     gc.setLineWidth(1);
     gc.strokeOval(x - radio, y - radio, radio * 2, radio * 2);
-    
+
     // Indicador de carga de batería
     double indicadorRadio = radio * 0.7;
     if (porcentajeBateria < 0.3) { // Batería baja
@@ -492,12 +555,12 @@ private void dibujarRobot(RobotDTO robot) {
     } else { // Batería alta
         gc.setFill(Color.LIGHTGREEN);
     }
-    
+
     double angulo = 360 * porcentajeBateria;
     gc.fillArc(x - indicadorRadio, y - indicadorRadio, 
                indicadorRadio * 2, indicadorRadio * 2, 
                90, -angulo, ArcType.ROUND);
-    
+
     // Indicador de carga (items)
     if (!robot.itemsEnCarga().isEmpty()) {
         // Un pequeño cuadrado encima del robot
@@ -505,7 +568,7 @@ private void dibujarRobot(RobotDTO robot) {
         gc.setFill(Color.YELLOW);
         gc.fillRect(x - tamano/2, y - radio - tamano - 2, tamano, tamano);
     }
-    
+
     // ID del robot o alguna otra identificación
     if (radio > 4) {
         gc.setFill(Color.WHITE);
@@ -522,9 +585,10 @@ private void dibujarRobot(RobotDTO robot) {
         double clickX = event.getX();
         double clickY = event.getY();
 
-        // Convertir coordenadas del canvas a coordenadas de la grilla (aproximado)
-        // int grillaX = (int) (clickX / ESCALA_DIBUJO);
-        // int grillaY = (int) (clickY / ESCALA_DIBUJO);
+        // Convertir coordenadas del canvas a coordenadas transformadas (considerando panning y zoom)
+        // Invertir la transformación para obtener las coordenadas en el espacio de la grilla
+        double transformedX = (clickX - offsetX) / escalaZoom;
+        double transformedY = (clickY - offsetY) / escalaZoom;
 
         // Buscar la entidad más cercana al clic (simplificado)
         String idEntidadSeleccionada = null;
@@ -535,8 +599,10 @@ private void dibujarRobot(RobotDTO robot) {
             for (RobotDTO robot : ultimosRobots) {
                 double rX = robot.posicion().x() * ESCALA_DIBUJO;
                 double rY = robot.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(clickX - rX, 2) + Math.pow(clickY - rY, 2);
-                if (distSq < Math.pow(RADIO_ROBOT * 1.5, 2) && distSq < minDistanciaSq) { // *1.5 para un área de clic mayor
+                double distSq = Math.pow(transformedX - rX, 2) + Math.pow(transformedY - rY, 2);
+                // Ajustar el área de clic según el zoom
+                double areaClickRobot = Math.pow(RADIO_ROBOT * 1.5, 2);
+                if (distSq < areaClickRobot && distSq < minDistanciaSq) {
                     minDistanciaSq = distSq;
                     idEntidadSeleccionada = robot.id();
                 }
@@ -548,8 +614,10 @@ private void dibujarRobot(RobotDTO robot) {
             for (CofreDTO cofre : ultimosCofres) {
                 double cX = cofre.posicion().x() * ESCALA_DIBUJO;
                 double cY = cofre.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(clickX - cX, 2) + Math.pow(clickY - cY, 2);
-                if (distSq < Math.pow(TAMANO_COFRE, 2) && distSq < minDistanciaSq) { // Área de clic un poco mayor que el cofre
+                double distSq = Math.pow(transformedX - cX, 2) + Math.pow(transformedY - cY, 2);
+                // Ajustar el área de clic según el zoom
+                double areaClickCofre = Math.pow(TAMANO_COFRE, 2);
+                if (distSq < areaClickCofre && distSq < minDistanciaSq) {
                     minDistanciaSq = distSq;
                     idEntidadSeleccionada = cofre.id();
                 }
@@ -561,8 +629,10 @@ private void dibujarRobot(RobotDTO robot) {
             for (RobopuertoDTO rp : ultimosRobopuertos) {
                 double rpX = rp.posicion().x() * ESCALA_DIBUJO;
                 double rpY = rp.posicion().y() * ESCALA_DIBUJO;
-                double distSq = Math.pow(clickX - rpX, 2) + Math.pow(clickY - rpY, 2);
-                if (distSq < Math.pow(TAMANO_ROBOPUERTO, 2) && distSq < minDistanciaSq) {
+                double distSq = Math.pow(transformedX - rpX, 2) + Math.pow(transformedY - rpY, 2);
+                // Ajustar el área de clic según el zoom
+                double areaClickRobopuerto = Math.pow(TAMANO_ROBOPUERTO, 2);
+                if (distSq < areaClickRobopuerto && distSq < minDistanciaSq) {
                     minDistanciaSq = distSq;
                     idEntidadSeleccionada = rp.id();
                 }
@@ -574,8 +644,41 @@ private void dibujarRobot(RobotDTO robot) {
             DetallesEntidadDTO detalles = servicioSimulacion.getDetallesEntidad(idEntidadSeleccionada);
             mostrarDetallesEntidad(detalles);
         } else {
-            textAreaDetallesEntidad.setText("Ninguna entidad seleccionada en ("+String.format("%.1f", clickX)+", "+String.format("%.1f", clickY)+").");
+            // Mostrar las coordenadas transformadas (en el espacio de la grilla)
+            double grillaX = transformedX / ESCALA_DIBUJO;
+            double grillaY = transformedY / ESCALA_DIBUJO;
+            textAreaDetallesEntidad.setText("Ninguna entidad seleccionada en (" + 
+                String.format("%.1f", grillaX) + ", " + 
+                String.format("%.1f", grillaY) + ") - Zoom: " + 
+                String.format("%.1f", escalaZoom) + "x");
         }
+    }
+
+    /**
+     * Maneja el evento de scroll para implementar zoom
+     */
+    private void handleScroll(ScrollEvent event) {
+        double zoomFactor = 1.05;
+        double deltaY = event.getDeltaY();
+
+        if (deltaY < 0) {
+            // Zoom out (reduce scale)
+            escalaZoom /= zoomFactor;
+        } else {
+            // Zoom in (increase scale)
+            escalaZoom *= zoomFactor;
+        }
+
+        // Limitar el zoom para evitar valores extremos
+        escalaZoom = Math.max(0.1, Math.min(escalaZoom, 5.0));
+
+        // Redibujar el canvas con la nueva escala
+        limpiarCanvas();
+        if (dimensionGrilla != null) {
+            dibujarEstado(servicioSimulacion.getEstadoActualSimulacion());
+        }
+
+        event.consume();
     }
 
     private void mostrarDetallesEntidad(DetallesEntidadDTO detalles) {

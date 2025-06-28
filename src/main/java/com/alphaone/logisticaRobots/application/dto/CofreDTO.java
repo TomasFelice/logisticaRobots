@@ -1,5 +1,6 @@
 package com.alphaone.logisticaRobots.application.dto;
 
+import java.util.List;
 import java.util.Map;
 
 /**

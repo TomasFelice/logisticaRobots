@@ -62,22 +62,15 @@
         "y": 0
       },
       "capacidadMaxima": 20,
-      "itemsSolicitados": [
-        {
-          "item": "tornillos",
-          "cantidad": 5
-        }
-      ],
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": {
+        "tuercas": "comportamiento_provision_pasiva",
+        "tornillos": "comportamiento_solicitud:prioridad=ACTIVO"
+      },
       "itemsAlmacenados": [
         {
           "item": "tuercas",
           "cantidad": 8
-        }
-      ],
-      "itemsOfrecidos": [
-        {
-          "item": "tuercas",
-          "cantidad": 5
         }
       ]
     },
@@ -87,26 +80,16 @@
         "y": 9
       },
       "capacidadMaxima": 15,
-      "itemsSolicitados": [
-        {
-          "item": "tuercas",
-          "cantidad": 3
-        },
-        {
-          "item": "arandelas",
-          "cantidad": 4
-        }
-      ],
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": {
+        "tornillos": "comportamiento_provision_activa",
+        "tuercas": "comportamiento_solicitud:prioridad=ACTIVO",
+        "arandelas": "comportamiento_solicitud:prioridad=ACTIVO"
+      },
       "itemsAlmacenados": [
         {
           "item": "tornillos",
           "cantidad": 10
-        }
-      ],
-      "itemsOfrecidos": [
-        {
-          "item": "tornillos",
-          "cantidad": 5
         }
       ]
     }

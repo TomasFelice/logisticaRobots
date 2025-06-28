@@ -243,47 +243,66 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
 
         List<Pedido> pedidosGenerados = new ArrayList<>();
-        int contadorPedidos = 1;
 
-        // Generar pedidos basados en los items solicitados de cada cofre
-        for (CofreDTO cofreDTO : configuracion.cofres()) {
-            if (cofreDTO.itemsSolicitados() != null && !cofreDTO.itemsSolicitados().isEmpty()) {
+        // Obtener todos los cofres de la red logística
+        List<CofreLogistico> cofres = new ArrayList<>(redLogistica.getCofres());
 
-                // Buscar el cofre correspondiente en la red logística
-                Punto posicionCofre = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
-                CofreLogistico cofreDestino = encontrarCofrePorPosicion(posicionCofre);
+        // Crear un conjunto de todos los items disponibles en el sistema
+        Set<String> itemsDisponibles = new HashSet<>();
+        for (CofreLogistico cofre : cofres) {
+            for (Item item : cofre.getInventario().getItems()) {
+                itemsDisponibles.add(item.getNombre());
+            }
+        }
 
-                if (cofreDestino != null) {
-                    for (ItemCantidadDTO itemSolicitado : cofreDTO.itemsSolicitados()) {
-                        // Crear el objeto Item
-                        Item item = new Item(itemSolicitado.item());
+        // Para cada item, buscar cofres que lo solicitan y cofres que lo ofrecen
+        for (String nombreItem : itemsDisponibles) {
+            Item item = new Item(nombreItem, nombreItem);
 
-                        // Buscar un cofre que ofrezca este item
-                        CofreLogistico cofreOrigen = encontrarCofreQueOfrece(item, configuracion);
+            // Encontrar cofres que pueden solicitar este item
+            List<CofreLogistico> cofresQueSolicitan = new ArrayList<>();
+            for (CofreLogistico cofre : cofres) {
+                if (cofre.puedeSolicitar(item, 1)) {
+                    cofresQueSolicitan.add(cofre);
+                }
+            }
 
-                        if (cofreOrigen != null) {
-                            // Crear el pedido
-                            Pedido pedido = new Pedido(
-                                    contadorPedidos++,
-                                    cofreOrigen,
-                                    cofreDestino,
-                                    item,
-                                    itemSolicitado.cantidad(),
-                                    EstadoPedido.PENDIENTE
-                            );
+            // Ordenar por prioridad de solicitud (mayor a menor)
+            cofresQueSolicitan.sort((c1, c2) -> Integer.compare(c2.getPrioridadSolicitud(item), c1.getPrioridadSolicitud(item)));
 
-                            pedidosGenerados.add(pedido);
-                            logger.debug("Pedido generado: {} de {} desde {} hasta {}",
-                                    itemSolicitado.cantidad(),
-                                    item.getNombre(),
-                                    cofreOrigen.getPosicion(),
-                                    cofreDestino.getPosicion());
-                        } else {
-                            logger.warn("No se encontró cofre que ofrezca el item: {}", itemSolicitado.item());
-                        }
+            // Encontrar cofres que pueden ofrecer este item
+            List<CofreLogistico> cofresQueOfrecen = new ArrayList<>();
+            for (CofreLogistico cofre : cofres) {
+                if (cofre.puedeOfrecer(item, 1)) {
+                    cofresQueOfrecen.add(cofre);
+                }
+            }
+
+            // Crear pedidos entre cofres que solicitan y cofres que ofrecen
+            for (CofreLogistico cofreDestino : cofresQueSolicitan) {
+                for (CofreLogistico cofreOrigen : cofresQueOfrecen) {
+                    // No crear pedidos entre el mismo cofre
+                    if (cofreOrigen.equals(cofreDestino)) {
+                        continue;
                     }
-                } else {
-                    logger.warn("No se encontró cofre en la posición: {}", posicionCofre);
+
+                    // Determinar la cantidad a solicitar (por simplicidad, usamos 1)
+                    int cantidad = 1;
+
+                    // Crear el pedido
+                    Pedido pedido = new Pedido(
+                            item,
+                            cantidad,
+                            cofreOrigen,
+                            cofreDestino
+                    );
+
+                    pedidosGenerados.add(pedido);
+                    logger.debug("Pedido generado: {} de {} desde {} hasta {}",
+                            cantidad,
+                            item.getNombre(),
+                            cofreOrigen.getPosicion(),
+                            cofreDestino.getPosicion());
                 }
             }
         }
@@ -293,7 +312,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             this.redLogistica.agregarPedido(pedido);
         }
 
-        logger.info("Se generaron {} pedidos automáticamente", pedidosGenerados.size());
+        logger.info("Se generaron {} pedidos automáticamente basados en comportamientos", pedidosGenerados.size());
     }
 
     // Método auxiliar para encontrar un cofre por posición
@@ -306,20 +325,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     // Método auxiliar para encontrar un cofre que ofrezca un item específico
     private CofreLogistico encontrarCofreQueOfrece(Item item, ConfiguracionSimulacionDTO configuracion) {
-        for (CofreDTO cofreDTO : configuracion.cofres()) {
-            if (cofreDTO.itemsOfrecidos() != null) {
-                boolean ofreceItem = cofreDTO.itemsOfrecidos().stream()
-                        .anyMatch(itemDTO -> itemDTO.item().equals(item.getNombre()));
-
-                if (ofreceItem) {
-                    Punto posicion = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
-                    CofreLogistico cofre = encontrarCofrePorPosicion(posicion);
-
-                    // Verificar que el cofre realmente puede ofrecer el item
-                    if (cofre != null && cofre.puedeOfrecer(item, 1)) {
-                        return cofre;
-                    }
-                }
+        // Buscar directamente en los cofres de la red logística
+        for (CofreLogistico cofre : redLogistica.getCofres()) {
+            // Verificar que el cofre realmente puede ofrecer el item según su comportamiento
+            if (cofre.puedeOfrecer(item, 1)) {
+                return cofre;
             }
         }
         return null;
@@ -691,9 +701,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             ConfiguracionComportamiento config = parsearConfiguracion(configuracion, capacidadMaximaDefecto);
 
             return switch (config.tipo.toLowerCase()) {
-                case "almacenamiento", "storage" -> new ComportamientoAlmacenamiento();
+                case "almacenamiento", "storage", "comportamiento_almacenamiento" -> new ComportamientoAlmacenamiento();
 
-                case "intermediobuffer", "buffer", "intermedio" -> {
+                case "intermediobuffer", "buffer", "intermedio", "comportamiento_intermedio_buffer" -> {
                     int umbralMinimo = (int) config.parametros.getOrDefault("umbralMinimo",
                             (int) (capacidadMaximaDefecto * 0.2)); // 20% por defecto
                     int umbralMaximo = (int) config.parametros.getOrDefault("umbralMaximo",
@@ -701,11 +711,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     yield new ComportamientoIntermedioBuffer(umbralMinimo, umbralMaximo);
                 }
 
-                case "provisionactiva", "provision_activa", "activa" -> new ComportamientoProvisionActiva();
+                case "provisionactiva", "provision_activa", "activa", "comportamiento_provision_activa" -> new ComportamientoProvisionActiva();
 
-                case "provisionpasiva", "provision_pasiva", "pasiva" -> new ComportamientoProvisionPasiva();
+                case "provisionpasiva", "provision_pasiva", "pasiva", "comportamiento_provision_pasiva" -> new ComportamientoProvisionPasiva();
 
-                case "solicitud", "request" -> {
+                case "solicitud", "request", "comportamiento_solicitud" -> {
                     ComportamientoSolicitud.Prioridad prioridad = ComportamientoSolicitud.Prioridad.valueOf(
                             config.parametros.getOrDefault("prioridad", "MEDIA").toString().toUpperCase()
                     );
@@ -768,8 +778,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
          */
         public static java.util.List<String> getTiposDisponibles() {
             return java.util.List.of(
-                    "almacenamiento", "intermediobuffer",
-                    "provisionactiva", "provisionpasiva", "solicitud"
+                    "comportamiento_almacenamiento", "comportamiento_intermedio_buffer",
+                    "comportamiento_provision_activa", "comportamiento_provision_pasiva", "comportamiento_solicitud"
             );
         }
 
@@ -786,12 +796,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     configuracion.split(":", 2)[0].trim() : configuracion.trim();
 
             return switch (tipo.toLowerCase()) {
-                case "almacenamiento", "storage",
+                case "almacenamiento", "storage", "comportamiento_almacenamiento",
                      "cofre", "general",
-                     "intermediobuffer", "buffer", "intermedio",
-                     "provisionactiva", "provision_activa", "activa",
-                     "provisionpasiva", "provision_pasiva", "pasiva",
-                     "solicitud", "request" -> true;
+                     "intermediobuffer", "buffer", "intermedio", "comportamiento_intermedio_buffer",
+                     "provisionactiva", "provision_activa", "activa", "comportamiento_provision_activa",
+                     "provisionpasiva", "provision_pasiva", "pasiva", "comportamiento_provision_pasiva",
+                     "solicitud", "request", "comportamiento_solicitud" -> true;
                 default -> false;
             };
         }
@@ -803,11 +813,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
          */
         public static Map<String, String> getEjemplosConfiguracion() {
             Map<String, String> ejemplos = new HashMap<>();
-            ejemplos.put("almacenamiento", "almacenamiento");
-            ejemplos.put("intermediobuffer", "intermediobuffer:umbralMinimo=10,umbralMaximo=40");
-            ejemplos.put("provisionactiva", "provisionactiva");
-            ejemplos.put("provisionpasiva", "provisionpasiva");
-            ejemplos.put("solicitud", "solicitud:prioridad=ALTA,capacidadMaxima=50");
+            ejemplos.put("almacenamiento", "comportamiento_almacenamiento");
+            ejemplos.put("intermediobuffer", "comportamiento_intermedio_buffer:umbralMinimo=10,umbralMaximo=40");
+            ejemplos.put("provisionactiva", "comportamiento_provision_activa");
+            ejemplos.put("provisionpasiva", "comportamiento_provision_pasiva");
+            ejemplos.put("solicitud", "comportamiento_solicitud:prioridad=ALTA,capacidadMaxima=50");
             return ejemplos;
         }
 

@@ -3,6 +3,7 @@ package com.alphaone.logisticaRobots.infrastructure.config;
 import com.alphaone.logisticaRobots.application.dto.ConfiguracionSimulacionDTO;
 import com.alphaone.logisticaRobots.application.dto.CofreDTO;
 import com.alphaone.logisticaRobots.application.dto.DimensionGrillaDTO;
+import com.alphaone.logisticaRobots.application.dto.ItemCantidadDTO;
 import com.alphaone.logisticaRobots.application.dto.PuntoDTO;
 import com.alphaone.logisticaRobots.application.dto.RobopuertoDTO;
 import com.alphaone.logisticaRobots.application.dto.RobotDTO;
@@ -210,6 +211,19 @@ public class LogisticaRobotsConfigLoader {
                     }
                 }
 
+                // Mapear comportamientos por item
+                Map<String, String> comportamientosPorItem = new HashMap<>();
+                if (cofreNode.has("comportamientosPorItem") && cofreNode.get("comportamientosPorItem").isObject()) {
+                    JsonNode comportamientosNode = cofreNode.get("comportamientosPorItem");
+                    comportamientosNode.fields().forEachRemaining(entry -> {
+                        comportamientosPorItem.put(entry.getKey(), entry.getValue().asText());
+                    });
+                }
+
+                // Obtener comportamiento por defecto
+                String comportamientoDefecto = cofreNode.has("comportamientoDefecto") ? 
+                        cofreNode.get("comportamientoDefecto").asText() : "almacenamiento";
+
                 // Crear el DTO de cofre
                 CofreDTO cofreDTO = new CofreDTO(
                         id, 
@@ -217,8 +231,8 @@ public class LogisticaRobotsConfigLoader {
                         inventario, 
                         inventario.values().stream().mapToInt(Integer::intValue).sum(), 
                         capacidadMaxima, 
-                        new HashMap<>(), 
-                        "almacenamiento", 
+                        comportamientosPorItem, 
+                        comportamientoDefecto, 
                         true
                 );
                 cofres.add(cofreDTO);
