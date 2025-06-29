@@ -181,7 +181,6 @@ public class LogisticaRobotsConfigLoader {
         List<CofreDTO> cofres = new ArrayList<>();
         if (rootNode.has("cofres") && rootNode.get("cofres").isArray()) {
             ArrayNode cofresArray = (ArrayNode) rootNode.get("cofres");
-           // int idCofre = 1; // Contador para asignar IDs -- TODO:
             for (JsonNode cofreNode : cofresArray) {
                 String id = cofreNode.has("id") ?
                         cofreNode.get("id").asText() : "";
@@ -212,7 +211,7 @@ public class LogisticaRobotsConfigLoader {
                     }
                 }
 
-                // TODO: Revisar. Mapear comportamientos por item
+                // Mapear comportamientos por item
                 Map<String, String> comportamientosPorItem = new HashMap<>();
                 if (cofreNode.has("comportamientosPorItem") && cofreNode.get("comportamientosPorItem").isObject()) {
                     JsonNode comportamientosNode = cofreNode.get("comportamientosPorItem");
@@ -221,6 +220,7 @@ public class LogisticaRobotsConfigLoader {
                     });
                 }
 
+                // TODO: Probablemente haya que sacarlo, ya no tiene sentido.
                 // Obtener comportamiento por defecto
                 String comportamientoDefecto = cofreNode.has("comportamientoDefecto") ? 
                         cofreNode.get("comportamientoDefecto").asText() : "almacenamiento";
