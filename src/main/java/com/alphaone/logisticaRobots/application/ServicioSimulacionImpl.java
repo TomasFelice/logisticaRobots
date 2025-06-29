@@ -285,38 +285,44 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                         // Crear el item
                         Item item = new Item(itemNombre, itemNombre);
 
-                        // Buscar un cofre origen que pueda ofrecer este item
-                        CofreLogistico cofreOrigen = null;
+                        // Buscar cofres origen que pueda ofrecer este item
+                        List<CofreLogistico> cofresOrigen = new ArrayList<>();
                         for (CofreLogistico cofre : redLogistica.getCofres()) {
                             if (cofre.puedeOfrecer(item, cantidad) && !cofre.equals(cofreDestino)) {
-                                cofreOrigen = cofre;
-                                // Determinar la prioridad basada en el comportamiento del cofre origen
-                                Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreOrigen, item);
-
-                                // Crear el pedido
-                                Pedido pedido = new Pedido(
-                                        item,
-                                        cantidad,
-                                        cofreOrigen,
-                                        cofreDestino,
-                                        prioridadPorComportamiento
-                                );
-
-                                pedidosGenerados.add(pedido);
-                                logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
-                                        cantidad,
-                                        item.getNombre(),
-                                        cofreOrigen.getId(),
-                                        cofreDestino.getId(),
-                                        prioridadPorComportamiento);
-                                break;
+                                cofresOrigen.add(cofre);
                             }
                         }
 
-                        if (cofreOrigen == null) {
+                        // Ordeno cofresOrigen por prioridad, descartando los prioridad 0 (no aplican)
+                        cofresOrigen.removeIf(cofre -> cofre.getPrioridadSolicitud(item) == 0);
+                        cofresOrigen.sort((c1, c2) -> Integer.compare(c2.getPrioridadSolicitud(item), c1.getPrioridadSolicitud(item)));
+
+                        // Si no hay cofres origen, no se crea el pedido
+                        if (cofresOrigen.isEmpty()) {
                             logger.warn("No se encontró un cofre origen que pueda ofrecer el item: {}", itemNombre);
                             continue;
                         }
+
+                        // Se crea el pedido con el cofre origen de mayor prioridad
+                        CofreLogistico cofreOrigen = cofresOrigen.get(0);
+                        Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreOrigen, item);
+
+                        // Crear el pedido
+                        Pedido pedido = new Pedido(
+                                item,
+                                cantidad,
+                                cofreOrigen,
+                                cofreDestino,
+                                prioridadPorComportamiento
+                        );
+
+                        pedidosGenerados.add(pedido);
+                        logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
+                                cantidad,
+                                item.getNombre(),
+                                cofreOrigen.getId(),
+                                cofreDestino.getId(),
+                                prioridadPorComportamiento);
                     }
 
                     // Si se cargaron pedidos desde el JSON, agregarlos a la red logística y terminar
@@ -333,6 +339,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             logger.error("Error al cargar pedidos desde JSON", e);
         }
 
+        // TODO:
+        //  @Nacho para mi de aca para abajo lo podemos borrar, deberiamos respetar siempre la estructura de archivo de config
+        //  en la que tengamos los pedidos
         // Si no se pudieron cargar pedidos desde el JSON, generarlos basados en comportamientos
         pedidosGenerados.clear();
 
