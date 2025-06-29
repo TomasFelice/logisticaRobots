@@ -30,7 +30,7 @@ import java.util.Objects;
 public class LogisticaRobotsConfigLoader {
 
     private static final Logger logger = LoggerFactory.getLogger(LogisticaRobotsConfigLoader.class);
-    private static final String CONFIG_FILE_PATH = "/config/logisticaRobotsConfig.json";
+    private static final String CONFIG_FILE_PATH = "/config/redConectadaCompletaCumplible.json";
 
     private ConfiguracionSimulacionDTO configuracion;
     private final ObjectMapper objectMapper;
@@ -181,9 +181,10 @@ public class LogisticaRobotsConfigLoader {
         List<CofreDTO> cofres = new ArrayList<>();
         if (rootNode.has("cofres") && rootNode.get("cofres").isArray()) {
             ArrayNode cofresArray = (ArrayNode) rootNode.get("cofres");
-            int idCofre = 1; // Contador para asignar IDs
+           // int idCofre = 1; // Contador para asignar IDs -- TODO:
             for (JsonNode cofreNode : cofresArray) {
-                String id = String.valueOf(idCofre++);
+                String id = cofreNode.has("id") ?
+                        cofreNode.get("id").asText() : "";
                 int capacidadMaxima = cofreNode.has("capacidadMaxima") ? 
                         cofreNode.get("capacidadMaxima").asInt() : 20;
 

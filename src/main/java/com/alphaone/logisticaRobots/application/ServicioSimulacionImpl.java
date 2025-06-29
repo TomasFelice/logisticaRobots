@@ -7,6 +7,9 @@ import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
 import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
 import com.alphaone.logisticaRobots.domain.comportamiento.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -239,14 +242,115 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     // Método auxiliar para cargar pedidos desde la configuración
-    // TODO: Revisar que esto este andando bien, no estoy seguro que funcione la logica de comportamientos
-    // TODO: Validar capacidad de cofres y robots
+    // Puede cargar pedidos directamente desde el JSON o generarlos basados en comportamientos
     private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion) {
         if (configuracion.cofres() == null || configuracion.cofres().isEmpty()) {
             return;
         }
 
         List<Pedido> pedidosGenerados = new ArrayList<>();
+
+         // Intentar cargar pedidos desde el archivo JSON
+        try {
+            // Usar el mismo archivo que se usó para cargar la configuración
+            File archivoConfig = archivoConfigActual;
+            if (archivoConfig == null || !archivoConfig.exists()) {
+                // Si no hay archivo, usar el predeterminado
+                archivoConfig = configLoader.getConfigFile();
+            }
+
+            if (archivoConfig != null && archivoConfig.exists()) {
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode rootNode = objectMapper.readTree(archivoConfig);
+
+                // Verificar si hay pedidos en el JSON
+                if (rootNode.has("pedidos") && rootNode.get("pedidos").isArray()) {
+                    ArrayNode pedidosArray = (ArrayNode) rootNode.get("pedidos");
+
+                    for (JsonNode pedidoNode : pedidosArray) {
+                        String itemNombre = pedidoNode.has("itemNombre") ? 
+                                pedidoNode.get("itemNombre").asText() : "";
+                        int cantidad = pedidoNode.has("cantidad") ? 
+                                pedidoNode.get("cantidad").asInt() : 1; //Por defecto 1 si no viene valor
+                        String cofreDestinoId = pedidoNode.has("cofreDestinoId") ? 
+                                pedidoNode.get("cofreDestinoId").asText() : "";
+                        String prioridadStr = pedidoNode.has("prioridad") ?
+                                pedidoNode.get("prioridad").asText() : "MEDIA"; //por defecto Media
+
+                        // Convertir string de prioridad a enum
+                        Pedido.PrioridadPedido prioridad;
+                        try {
+                            prioridad = Pedido.PrioridadPedido.valueOf(prioridadStr);
+                        } catch (IllegalArgumentException e) {
+                            prioridad = Pedido.PrioridadPedido.MEDIA; // Valor por defecto
+                        }
+
+                        // Buscar el cofre destino
+                        CofreLogistico cofreDestino = redLogistica.buscarCofrePorId(cofreDestinoId);
+                        if (cofreDestino == null) {
+                            logger.warn("No se encontró el cofre destino con ID: {}", cofreDestinoId);
+                            continue;
+                        }
+
+                        // Crear el item
+                        Item item = new Item(itemNombre, itemNombre);
+
+                        // Buscar un cofre origen que pueda ofrecer este item
+                        CofreLogistico cofreOrigen = null;
+                        for (CofreLogistico cofre : redLogistica.getCofres()) {
+                            if (cofre.puedeOfrecer(item, cantidad) && !cofre.equals(cofreDestino)) {
+                                cofreOrigen = cofre;
+                                break;
+                            }
+                        }
+
+                        if (cofreOrigen == null) {
+                            logger.warn("No se encontró un cofre origen que pueda ofrecer el item: {}", itemNombre);
+                            continue;
+                        }
+
+                        // Determinar la prioridad basada en el comportamiento del cofre origen
+                        Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreDestino, item);
+
+                        prioridad = prioridadPorComportamiento;
+//                        // Si la prioridad no viene especificada en el JSON, usar la determinada por el comportamiento
+//                        if (prioridadStr.equals("MEDIA") && !pedidoNode.has("prioridad")) {
+//                        }
+
+                        // Crear el pedido
+                        Pedido pedido = new Pedido(
+                                item,
+                                cantidad,
+                                cofreOrigen,
+                                cofreDestino,
+                                prioridad
+                        );
+
+                        pedidosGenerados.add(pedido);
+                        logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
+                                cantidad,
+                                item.getNombre(),
+                                cofreOrigen.getId(),
+                                cofreDestino.getId(),
+                                prioridad);
+                    }
+
+                    // Si se cargaron pedidos desde el JSON, agregarlos a la red logística y terminar
+                    if (!pedidosGenerados.isEmpty()) {
+                        for (Pedido pedido : pedidosGenerados) {
+                            this.redLogistica.agregarPedido(pedido);
+                        }
+                        logger.info("Se cargaron {} pedidos desde el archivo JSON", pedidosGenerados.size());
+                        return;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error al cargar pedidos desde JSON", e);
+        }
+
+        // Si no se pudieron cargar pedidos desde el JSON, generarlos basados en comportamientos
+        pedidosGenerados.clear();
 
         // Obtener todos los cofres de la red logística
         List<CofreLogistico> cofres = new ArrayList<>(redLogistica.getCofres());
@@ -294,20 +398,38 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     // TODO: Validar la cantidad de items que muevo de un cofre a otro
                     int cantidad = 1;
 
+                    // Determinar la prioridad basada en el comportamiento del cofre destino
+                    int prioridadValor = cofreDestino.getPrioridadSolicitud(item);
+                    Pedido.PrioridadPedido prioridad;
+
+                    // Mapear el valor de prioridad al enum PrioridadPedido
+                    if (prioridadValor == 3) {
+                        prioridad = Pedido.PrioridadPedido.ALTA;
+                    } else if (prioridadValor == 2) {
+                        prioridad = Pedido.PrioridadPedido.MEDIA;
+                    } else if (prioridadValor == 1) {
+                        prioridad = Pedido.PrioridadPedido.BAJA;
+                    } else {
+                        // Valor por defecto si no se puede determinar la prioridad
+                        prioridad = Pedido.PrioridadPedido.MEDIA;
+                    }
+
                     // Crear el pedido
                     Pedido pedido = new Pedido(
                             item,
                             cantidad,
                             cofreOrigen,
-                            cofreDestino
+                            cofreDestino,
+                            prioridad
                     );
 
                     pedidosGenerados.add(pedido);
-                    logger.debug("Pedido generado: {} de {} desde {} hasta {}",
+                    logger.debug("Pedido generado: {} de {} desde {} hasta {}. Prioridad {}",
                             cantidad,
                             item.getNombre(),
                             cofreOrigen.getPosicion(),
-                            cofreDestino.getPosicion());
+                            cofreDestino.getPosicion(),
+                            prioridad);
                 }
             }
         }
@@ -338,6 +460,28 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             }
         }
         return null;
+    }
+
+    /**
+     * Determina la prioridad del pedido basada en el tipo de comportamiento del cofre
+     * Orden de prioridad: proveedores activos, búfer, pasivos
+     */
+    private Pedido.PrioridadPedido determinarPrioridadPorComportamiento(CofreLogistico cofre, Item item) {
+        String tipo = cofre.getTipoComportamiento(item);
+
+        // Convertir a minúsculas para hacer la comparación insensible a mayúsculas/minúsculas
+        String tipoLower = tipo.toLowerCase();
+
+        // Determinar prioridad según el tipo de comportamiento
+        if (tipoLower.contains("activa") || tipoLower.contains("provision activa")) {
+            return Pedido.PrioridadPedido.ALTA; // Proveedores activos tienen la mayor prioridad
+        } else if (tipoLower.contains("buffer") || tipoLower.contains("intermedio")) {
+            return Pedido.PrioridadPedido.MEDIA; // Búfer tienen prioridad media
+        } else if (tipoLower.contains("pasiva") || tipoLower.contains("provision pasiva")) {
+            return Pedido.PrioridadPedido.BAJA; // Proveedores pasivos tienen la menor prioridad
+        } else {
+            return Pedido.PrioridadPedido.MEDIA; // Por defecto, prioridad media
+        }
     }
 
     // Métodos auxiliares para cargar cada tipo de entidad
@@ -725,7 +869,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
                 case "solicitud", "request", "comportamiento_solicitud" -> {
                     ComportamientoSolicitud.Prioridad prioridad = ComportamientoSolicitud.Prioridad.valueOf(
-                            config.parametros.getOrDefault("prioridad", "MEDIA").toString().toUpperCase()
+                            config.parametros.getOrDefault("prioridad", "BUFFER").toString().toUpperCase() //TODO: ARREGLAR BUFFER
                     );
                     int capacidadMaxima = (int) config.parametros.getOrDefault("capacidadMaxima", capacidadMaximaDefecto);
                     yield new ComportamientoSolicitud(prioridad, capacidadMaxima);
@@ -825,7 +969,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             ejemplos.put("intermediobuffer", "comportamiento_intermedio_buffer:umbralMinimo=10,umbralMaximo=40");
             ejemplos.put("provisionactiva", "comportamiento_provision_activa");
             ejemplos.put("provisionpasiva", "comportamiento_provision_pasiva");
-            ejemplos.put("solicitud", "comportamiento_solicitud:prioridad=ALTA,capacidadMaxima=50");
+            ejemplos.put("solicitud", "comportamiento_solicitud:prioridad=ACTIVO,capacidadMaxima=50");
             return ejemplos;
         }
 

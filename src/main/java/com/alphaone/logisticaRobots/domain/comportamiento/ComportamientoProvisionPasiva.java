@@ -24,6 +24,6 @@ public class ComportamientoProvisionPasiva implements ComportamientoCofre {
 
     @Override
     public String getTipo() {
-        return "Provisión Pasiva";
+        return "Provision Pasiva";
     }
 }

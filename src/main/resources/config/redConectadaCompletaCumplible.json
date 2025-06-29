@@ -1,0 +1,78 @@
+{
+  "grilla": {
+    "dimensiones": {
+      "ancho": 10,
+      "alto": 10
+    }
+  },
+  "factorConsumo": 1.0,
+  "robopuertos": [
+    {
+      "id": "RP_Centro",
+      "posicion": { "x": 5, "y": 5 },
+      "alcance": 6,
+      "cargasSimultaneas": 2,
+      "estado": "activo"
+    },
+    {
+      "id": "RP_Esquina",
+      "posicion": { "x": 0, "y": 0 },
+      "alcance": 3,
+      "cargasSimultaneas": 1,
+      "estado": "activo"
+    }
+  ],
+  "robots": [
+    {
+      "id": "R_1",
+      "robopuertoInicialId": "RP_Centro",
+      "capacidadMaximaBateria": 100,
+      "cargaBateriaActual": 100,
+      "capacidadTraslado": 5,
+      "estado": "disponible"
+    }
+  ],
+  "items": [
+    { "nombre": "piezaA" }
+  ],
+  "cofres": [
+    {
+      "id": "C_Esquina_S",
+      "posicion": { "x": 1, "y": 1 },
+      "capacidadMaxima": 10,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": { "piezaA": "comportamiento_solicitud" },
+      "itemsAlmacenados": []
+    },
+    {
+      "id": "C_Extremo_P",
+      "posicion": { "x": 9, "y": 9 },
+      "capacidadMaxima": 10,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": { "piezaA": "comportamiento_provision_activa" },
+      "itemsAlmacenados": [ { "item": "piezaA", "cantidad": 10 } ]
+    },
+    {
+      "id": "C_Central",
+      "posicion": { "x": 5, "y": 4 },
+      "capacidadMaxima": 10,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": {},
+      "itemsAlmacenados": []
+    }
+  ],
+  "pedidos": [
+    {
+      "id": "PED_TOTAL_1",
+      "itemNombre": "piezaA",
+      "cantidad": 3,
+      "cofreDestinoId": "C_Esquina_S"
+    },
+    {
+      "id": "PED_TOTAL_2",
+      "itemNombre": "piezaA",
+      "cantidad": 3,
+      "cofreDestinoId": "C_Esquina_S"
+    }
+  ]
+}

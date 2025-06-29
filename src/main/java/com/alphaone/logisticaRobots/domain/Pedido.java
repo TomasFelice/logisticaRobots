@@ -11,19 +11,25 @@ public class Pedido {
         NUEVO, EN_PROCESO, COMPLETADO, FALLIDO
     }
 
+    public enum PrioridadPedido {
+        ALTA, MEDIA, BAJA
+    }
     private final Item item;
     private final int cantidad;
     private final CofreLogistico cofreOrigen;
     private final CofreLogistico cofreDestino;
     private EstadoPedido estado;
+    private PrioridadPedido prioridad;
 
-    public Pedido(Item item, int cantidad, CofreLogistico origen, CofreLogistico destino) {
+
+    public Pedido(Item item, int cantidad, CofreLogistico origen, CofreLogistico destino,PrioridadPedido prioridad) {
         if (cantidad <= 0) throw new IllegalArgumentException("La cantidad debe ser positiva");
         this.item = Objects.requireNonNull(item);
         this.cantidad = cantidad;
         this.cofreOrigen = Objects.requireNonNull(origen);
         this.cofreDestino = Objects.requireNonNull(destino);
         this.estado = EstadoPedido.NUEVO;
+        this.prioridad = prioridad;
     }
 
     // Getters
@@ -32,6 +38,7 @@ public class Pedido {
     public CofreLogistico getCofreOrigen() { return cofreOrigen; }
     public CofreLogistico getCofreDestino() { return cofreDestino; }
     public EstadoPedido getEstado() { return estado; }
+    public PrioridadPedido getPrioridad() { return prioridad; }
 
     // Estados
     public void marcarEnProceso() {

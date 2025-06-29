@@ -24,6 +24,6 @@ public class ComportamientoProvisionActiva implements ComportamientoCofre {
 
     @Override
     public String getTipo() {
-        return "Provisión Activa";
+        return "Provision Activa";
     }
 }
