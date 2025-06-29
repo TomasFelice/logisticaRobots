@@ -98,15 +98,20 @@ public class RedLogistica { // es el universo donde se componen las cosas
     }
 
     /**
-     * TODO:
-     *  Revisar el funcionamiento general del metodo y evaluar pasarlo a
-     *  Planificador ya que no es responsabilidad de la red logistica el hecho de asignar un pedido a un robot
      * Simula un ciclo de movimiento de todos los robots de la red.
+     * Utiliza el Planificador para calcular las rutas más eficientes para los pedidos
+     * y asignarlos a los robots según su prioridad y capacidades.
      * Procesa los pedidos pendientes y mueve los robots según sea necesario.
      */
     public void simularCiclo() {
-        // Procesar pedidos pendientes
-        procesarPedidosPendientes();
+        // Utilizar el planificador para calcular las rutas más eficientes y asignar pedidos a robots
+        boolean todosPedidosSatisfechos = planificador.ejecutarRutas();
+
+        if (todosPedidosSatisfechos) {
+            System.out.println("Todos los pedidos han sido satisfechos o están en proceso");
+        } else {
+            System.out.println("Algunos pedidos no pudieron ser satisfechos");
+        }
 
         // Procesar robots según su estado actual
         for (RobotLogistico robot : robotsLogisticos) {
@@ -142,46 +147,6 @@ public class RedLogistica { // es el universo donde se componen las cosas
         }
     }
 
-    /**
-     * Procesa los pedidos pendientes asignándolos a robots disponibles.
-     */
-    private void procesarPedidosPendientes() {
-        if (pedidos.isEmpty()) {
-            return;
-        }
-
-        // Filtrar robots activos y disponibles
-        List<RobotLogistico> robotsDisponibles = robotsLogisticos.stream()
-                .filter(r -> r.getEstado() == EstadoRobot.ACTIVO)
-                .collect(Collectors.toList());
-
-        if (robotsDisponibles.isEmpty()) {
-            return;
-        }
-
-        // Asignar pedidos a robots disponibles
-        // TODO: Evaluar prioridad.
-        for (Pedido pedido : new ArrayList<>(pedidos)) {
-            if (pedido.getEstado() == Pedido.EstadoPedido.NUEVO) {
-                // Buscar un robot disponible
-                for (RobotLogistico robot : robotsDisponibles) {
-                    // Verificar si el robot puede manejar este pedido
-                    // (tiene suficiente batería, está cerca, etc.)
-                    if (robot.tieneSuficienteBateria(50)) { // Valor arbitrario para ejemplo
-                        robot.agregarPedido(pedido);
-                        pedido.marcarEnProceso();
-                        robot.cambiarEstado(EstadoRobot.EN_MISION);
-                        robotsDisponibles.remove(robot);
-                        break;
-                    }
-                }
-            }
-
-            if (robotsDisponibles.isEmpty()) {
-                break; // No hay más robots disponibles
-            }
-        }
-    }
 
     /**
      * Indica que ya cumplió con todos los pedidos y no tiene más
@@ -266,7 +231,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         if (idRobot == null) {
             return null;
         }
-        
+
         return robotsLogisticos.stream()
                 .filter(robot -> idRobot.equals(String.valueOf(robot.getId())))
                 .findFirst()
@@ -277,7 +242,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         if (idEntidad == null) {
             return null;
         }
-        
+
         return cofres.stream()
                 .filter(cofre -> idEntidad.equals(cofre.getId()))
                 .findFirst()
@@ -288,7 +253,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         if (idEntidad == null) {
             return null;
         }
-        
+
         return robopuertos.stream()
                 .filter(robopuerto -> idEntidad.equals(robopuerto.getId()))
                 .findFirst()
