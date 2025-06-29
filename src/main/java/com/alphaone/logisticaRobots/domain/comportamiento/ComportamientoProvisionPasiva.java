@@ -19,7 +19,7 @@ public class ComportamientoProvisionPasiva implements ComportamientoCofre {
 
     @Override
     public int getPrioridadSolicitud(Item item, CofreLogistico cofre) {
-        return 0; // No aplica
+        return 1; // Baja
     }
 
     @Override

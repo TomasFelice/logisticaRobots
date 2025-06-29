@@ -2,25 +2,25 @@ package com.alphaone.logisticaRobots.application;
 
 import com.alphaone.logisticaRobots.application.dto.*;
 import com.alphaone.logisticaRobots.domain.*;
-import com.alphaone.logisticaRobots.domain.comportamiento.ComportamientoCofre;
-import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
-import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
-import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
 import com.alphaone.logisticaRobots.domain.comportamiento.*;
+import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
+import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
+import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.io.IOException;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Implementación del servicio de simulación que gestiona la lógica y el estado del sistema.
@@ -274,16 +274,6 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                                 pedidoNode.get("cantidad").asInt() : 1; //Por defecto 1 si no viene valor
                         String cofreDestinoId = pedidoNode.has("cofreDestinoId") ? 
                                 pedidoNode.get("cofreDestinoId").asText() : "";
-                        String prioridadStr = pedidoNode.has("prioridad") ?
-                                pedidoNode.get("prioridad").asText() : "MEDIA"; //por defecto Media
-
-                        // Convertir string de prioridad a enum
-                        Pedido.PrioridadPedido prioridad;
-                        try {
-                            prioridad = Pedido.PrioridadPedido.valueOf(prioridadStr);
-                        } catch (IllegalArgumentException e) {
-                            prioridad = Pedido.PrioridadPedido.MEDIA; // Valor por defecto
-                        }
 
                         // Buscar el cofre destino
                         CofreLogistico cofreDestino = redLogistica.buscarCofrePorId(cofreDestinoId);
@@ -300,6 +290,25 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                         for (CofreLogistico cofre : redLogistica.getCofres()) {
                             if (cofre.puedeOfrecer(item, cantidad) && !cofre.equals(cofreDestino)) {
                                 cofreOrigen = cofre;
+                                // Determinar la prioridad basada en el comportamiento del cofre origen
+                                Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreOrigen, item);
+
+                                // Crear el pedido
+                                Pedido pedido = new Pedido(
+                                        item,
+                                        cantidad,
+                                        cofreOrigen,
+                                        cofreDestino,
+                                        prioridadPorComportamiento
+                                );
+
+                                pedidosGenerados.add(pedido);
+                                logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
+                                        cantidad,
+                                        item.getNombre(),
+                                        cofreOrigen.getId(),
+                                        cofreDestino.getId(),
+                                        prioridadPorComportamiento);
                                 break;
                             }
                         }
@@ -308,31 +317,6 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                             logger.warn("No se encontró un cofre origen que pueda ofrecer el item: {}", itemNombre);
                             continue;
                         }
-
-                        // Determinar la prioridad basada en el comportamiento del cofre origen
-                        Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreDestino, item);
-
-                        prioridad = prioridadPorComportamiento;
-//                        // Si la prioridad no viene especificada en el JSON, usar la determinada por el comportamiento
-//                        if (prioridadStr.equals("MEDIA") && !pedidoNode.has("prioridad")) {
-//                        }
-
-                        // Crear el pedido
-                        Pedido pedido = new Pedido(
-                                item,
-                                cantidad,
-                                cofreOrigen,
-                                cofreDestino,
-                                prioridad
-                        );
-
-                        pedidosGenerados.add(pedido);
-                        logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
-                                cantidad,
-                                item.getNombre(),
-                                cofreOrigen.getId(),
-                                cofreDestino.getId(),
-                                prioridad);
                     }
 
                     // Si se cargaron pedidos desde el JSON, agregarlos a la red logística y terminar
@@ -375,9 +359,6 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 }
             }
 
-            // Ordenar por prioridad de solicitud (mayor a menor)
-            cofresQueSolicitan.sort((c1, c2) -> Integer.compare(c2.getPrioridadSolicitud(item), c1.getPrioridadSolicitud(item)));
-
             // Encontrar cofres que pueden ofrecer este item
             List<CofreLogistico> cofresQueOfrecen = new ArrayList<>();
             for (CofreLogistico cofre : cofres) {
@@ -398,21 +379,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     // TODO: Validar la cantidad de items que muevo de un cofre a otro
                     int cantidad = 1;
 
-                    // Determinar la prioridad basada en el comportamiento del cofre destino
-                    int prioridadValor = cofreDestino.getPrioridadSolicitud(item);
-                    Pedido.PrioridadPedido prioridad;
-
-                    // Mapear el valor de prioridad al enum PrioridadPedido
-                    if (prioridadValor == 3) {
-                        prioridad = Pedido.PrioridadPedido.ALTA;
-                    } else if (prioridadValor == 2) {
-                        prioridad = Pedido.PrioridadPedido.MEDIA;
-                    } else if (prioridadValor == 1) {
-                        prioridad = Pedido.PrioridadPedido.BAJA;
-                    } else {
-                        // Valor por defecto si no se puede determinar la prioridad
-                        prioridad = Pedido.PrioridadPedido.MEDIA;
-                    }
+                    // Determinar la prioridad basada en el comportamiento del cofre de origen
+                    int prioridadValor = cofreOrigen.getPrioridadSolicitud(item);
+                    Pedido.PrioridadPedido prioridad = getPrioridadPedido(prioridadValor);
 
                     // Crear el pedido
                     Pedido pedido = new Pedido(
@@ -442,24 +411,21 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         logger.info("Se generaron {} pedidos automáticamente basados en comportamientos", pedidosGenerados.size());
     }
 
-    // Método auxiliar para encontrar un cofre por posición
-    private CofreLogistico encontrarCofrePorPosicion(Punto posicion) {
-        return this.redLogistica.getCofres().stream()
-                .filter(cofre -> cofre.getPosicion().equals(posicion))
-                .findFirst()
-                .orElse(null);
-    }
+    private static Pedido.PrioridadPedido getPrioridadPedido(int prioridadValor) {
+        Pedido.PrioridadPedido prioridad;
 
-    // Método auxiliar para encontrar un cofre que ofrezca un item específico
-    private CofreLogistico encontrarCofreQueOfrece(Item item, ConfiguracionSimulacionDTO configuracion) {
-        // Buscar directamente en los cofres de la red logística
-        for (CofreLogistico cofre : redLogistica.getCofres()) {
-            // Verificar que el cofre realmente puede ofrecer el item según su comportamiento
-            if (cofre.puedeOfrecer(item, 1)) {
-                return cofre;
-            }
+        // Mapear el valor de prioridad al enum PrioridadPedido
+        if (prioridadValor == 3) {
+            prioridad = Pedido.PrioridadPedido.ALTA;
+        } else if (prioridadValor == 2) {
+            prioridad = Pedido.PrioridadPedido.MEDIA;
+        } else if (prioridadValor == 1) {
+            prioridad = Pedido.PrioridadPedido.BAJA;
+        } else {
+            // Valor por defecto si no se puede determinar la prioridad
+            prioridad = Pedido.PrioridadPedido.MEDIA;
         }
-        return null;
+        return prioridad;
     }
 
     /**
@@ -479,6 +445,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             return Pedido.PrioridadPedido.MEDIA; // Búfer tienen prioridad media
         } else if (tipoLower.contains("pasiva") || tipoLower.contains("provision pasiva")) {
             return Pedido.PrioridadPedido.BAJA; // Proveedores pasivos tienen la menor prioridad
+        } else if (tipoLower.contains("solicitud")) {
+            return Pedido.PrioridadPedido.NO_APLICA; // Si es de tipo solicitud no tiene prioridad porque no realiza pedidos.
         } else {
             return Pedido.PrioridadPedido.MEDIA; // Por defecto, prioridad media
         }
@@ -710,8 +678,6 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     // Métodos auxiliares para convertir entidades individuales a DTOs
 
     private RobotDTO obtenerRobotDTO(RobotLogistico robot) {
-        // Código similar a convertirRobotsADTOs pero para un solo robot
-        // ... (implementación similar)
         return convertirRobotsADTOs().stream()
                 .filter(r -> r.id().equals(String.valueOf(robot.getId())))
                 .findFirst()
@@ -766,9 +732,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
          * @return El cofre logístico configurado
          */
         public static CofreLogistico crearCofre(String id, Punto posicion, int capacidad, String tipoComportamiento) {
-            Objects.requireNonNull(id, "ID del cofre no puede ser null");
-            Objects.requireNonNull(posicion, "Posición del cofre no puede ser null");
-            Objects.requireNonNull(tipoComportamiento, "Tipo de comportamiento no puede ser null");
+            requireNonNull(id, "ID del cofre no puede ser null");
+            requireNonNull(posicion, "Posición del cofre no puede ser null");
+            requireNonNull(tipoComportamiento, "Tipo de comportamiento no puede ser null");
 
             if (capacidad <= 0) {
                 throw new IllegalArgumentException("La capacidad debe ser mayor a 0");
@@ -847,143 +813,26 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
          * @throws IllegalArgumentException Si el tipo no es reconocido
          */
         public static ComportamientoCofre crearConParametros(String configuracion, int capacidadMaximaDefecto) {
-            Objects.requireNonNull(configuracion, "Configuración de comportamiento no puede ser null");
+            requireNonNull(configuracion, "Configuración de comportamiento no puede ser null");
 
-            // Parsear la configuración para extraer tipo y parámetros
-            ConfiguracionComportamiento config = parsearConfiguracion(configuracion, capacidadMaximaDefecto);
+            return switch (configuracion) {
+                case "comportamiento_almacenamiento" -> new ComportamientoAlmacenamiento();
 
-            return switch (config.tipo.toLowerCase()) {
-                case "almacenamiento", "storage", "comportamiento_almacenamiento" -> new ComportamientoAlmacenamiento();
-
-                case "intermediobuffer", "buffer", "intermedio", "comportamiento_intermedio_buffer" -> {
-                    int umbralMinimo = (int) config.parametros.getOrDefault("umbralMinimo",
-                            (int) (capacidadMaximaDefecto * 0.2)); // 20% por defecto
-                    int umbralMaximo = (int) config.parametros.getOrDefault("umbralMaximo",
-                            (int) (capacidadMaximaDefecto * 0.8)); // 80% por defecto
+                case "comportamiento_intermedio_buffer" -> {
+                    int umbralMinimo = (int) (capacidadMaximaDefecto * 0.2); // 20% por defecto
+                    int umbralMaximo = (int) (capacidadMaximaDefecto * 0.8); // 80% por defecto
                     yield new ComportamientoIntermedioBuffer(umbralMinimo, umbralMaximo);
                 }
 
-                case "provisionactiva", "provision_activa", "activa", "comportamiento_provision_activa" -> new ComportamientoProvisionActiva();
+                case "comportamiento_provision_activa" -> new ComportamientoProvisionActiva();
 
-                case "provisionpasiva", "provision_pasiva", "pasiva", "comportamiento_provision_pasiva" -> new ComportamientoProvisionPasiva();
+                case "comportamiento_provision_pasiva" -> new ComportamientoProvisionPasiva();
 
-                case "solicitud", "request", "comportamiento_solicitud" -> {
-                    ComportamientoSolicitud.Prioridad prioridad = ComportamientoSolicitud.Prioridad.valueOf(
-                            config.parametros.getOrDefault("prioridad", "BUFFER").toString().toUpperCase() //TODO: ARREGLAR BUFFER
-                    );
-                    int capacidadMaxima = (int) config.parametros.getOrDefault("capacidadMaxima", capacidadMaximaDefecto);
-                    yield new ComportamientoSolicitud(prioridad, capacidadMaxima);
-                }
+                case "comportamiento_solicitud" -> new ComportamientoSolicitud(capacidadMaximaDefecto);
 
-                default -> throw new IllegalArgumentException("Tipo de comportamiento no reconocido: " + config.tipo);
+                default -> throw new IllegalArgumentException("Tipo de comportamiento no reconocido: " + configuracion);
             };
         }
 
-        /**
-         * Parsea la configuración de comportamiento para extraer tipo y parámetros
-         *
-         * @param configuracion La cadena de configuración
-         * @param capacidadDefecto La capacidad por defecto
-         * @return La configuración parseada
-         */
-        private static ConfiguracionComportamiento parsearConfiguracion(String configuracion, int capacidadDefecto) {
-            Map<String, Object> parametros = new HashMap<>();
-            String tipo;
-
-            // Si la configuración contiene parámetros (formato: "tipo:param1=valor1,param2=valor2")
-            if (configuracion.contains(":")) {
-                String[] partes = configuracion.split(":", 2);
-                tipo = partes[0].trim();
-
-                if (partes.length > 1) {
-                    String[] params = partes[1].split(",");
-                    for (String param : params) {
-                        String[] keyValue = param.split("=");
-                        if (keyValue.length == 2) {
-                            String key = keyValue[0].trim();
-                            String value = keyValue[1].trim();
-
-                            // Intentar parsear como número, si no, mantener como String
-                            try {
-                                if (key.toLowerCase().contains("prioridad")) {
-                                    parametros.put(key, value.toUpperCase());
-                                } else {
-                                    parametros.put(key, Integer.parseInt(value));
-                                }
-                            } catch (NumberFormatException e) {
-                                parametros.put(key, value);
-                            }
-                        }
-                    }
-                }
-            } else {
-                tipo = configuracion.trim();
-            }
-
-            return new ConfiguracionComportamiento(tipo, parametros);
-        }
-
-        /**
-         * Obtiene todos los tipos de comportamiento disponibles
-         *
-         * @return Lista de tipos de comportamiento soportados
-         */
-        public static java.util.List<String> getTiposDisponibles() {
-            return java.util.List.of(
-                    "comportamiento_almacenamiento", "comportamiento_intermedio_buffer",
-                    "comportamiento_provision_activa", "comportamiento_provision_pasiva", "comportamiento_solicitud"
-            );
-        }
-
-        /**
-         * Verifica si un tipo de comportamiento es válido
-         *
-         * @param configuracion La configuración a verificar
-         * @return true si es válido, false en caso contrario
-         */
-        public static boolean esTipoValido(String configuracion) {
-            if (configuracion == null) return false;
-
-            String tipo = configuracion.contains(":") ?
-                    configuracion.split(":", 2)[0].trim() : configuracion.trim();
-
-            return switch (tipo.toLowerCase()) {
-                case "almacenamiento", "storage", "comportamiento_almacenamiento",
-                     "cofre", "general",
-                     "intermediobuffer", "buffer", "intermedio", "comportamiento_intermedio_buffer",
-                     "provisionactiva", "provision_activa", "activa", "comportamiento_provision_activa",
-                     "provisionpasiva", "provision_pasiva", "pasiva", "comportamiento_provision_pasiva",
-                     "solicitud", "request", "comportamiento_solicitud" -> true;
-                default -> false;
-            };
-        }
-
-        /**
-         * Genera una configuración de ejemplo para cada tipo de comportamiento
-         *
-         * @return Mapa con ejemplos de configuración
-         */
-        public static Map<String, String> getEjemplosConfiguracion() {
-            Map<String, String> ejemplos = new HashMap<>();
-            ejemplos.put("almacenamiento", "comportamiento_almacenamiento");
-            ejemplos.put("intermediobuffer", "comportamiento_intermedio_buffer:umbralMinimo=10,umbralMaximo=40");
-            ejemplos.put("provisionactiva", "comportamiento_provision_activa");
-            ejemplos.put("provisionpasiva", "comportamiento_provision_pasiva");
-            ejemplos.put("solicitud", "comportamiento_solicitud:prioridad=ACTIVO,capacidadMaxima=50");
-            return ejemplos;
-        }
-
-        /**
-         * Clase interna para representar la configuración parseada de un comportamiento
-         */
-        private static class ConfiguracionComportamiento {
-            final String tipo;
-            final Map<String, Object> parametros;
-
-            public ConfiguracionComportamiento(String tipo, Map<String, Object> parametros) {
-                this.tipo = tipo;
-                this.parametros = parametros != null ? parametros : new HashMap<>();
-            }
-        }
     }
 }

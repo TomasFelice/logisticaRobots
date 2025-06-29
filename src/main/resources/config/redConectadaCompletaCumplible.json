@@ -1,8 +1,8 @@
 {
   "grilla": {
     "dimensiones": {
-      "ancho": 10,
-      "alto": 10
+      "ancho": 30,
+      "alto": 30
     }
   },
   "factorConsumo": 1.0,

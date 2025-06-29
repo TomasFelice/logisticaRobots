@@ -1,9 +1,8 @@
 package com.alphaone.logisticaRobots.domain;
 
-import com.alphaone.logisticaRobots.domain.CofreLogistico;
-import com.alphaone.logisticaRobots.domain.Item;
-
 import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
 
 public class Pedido {
 
@@ -12,7 +11,7 @@ public class Pedido {
     }
 
     public enum PrioridadPedido {
-        ALTA, MEDIA, BAJA
+        ALTA, MEDIA, BAJA, NO_APLICA
     }
     private final Item item;
     private final int cantidad;
@@ -24,10 +23,10 @@ public class Pedido {
 
     public Pedido(Item item, int cantidad, CofreLogistico origen, CofreLogistico destino,PrioridadPedido prioridad) {
         if (cantidad <= 0) throw new IllegalArgumentException("La cantidad debe ser positiva");
-        this.item = Objects.requireNonNull(item);
+        this.item = requireNonNull(item);
         this.cantidad = cantidad;
-        this.cofreOrigen = Objects.requireNonNull(origen);
-        this.cofreDestino = Objects.requireNonNull(destino);
+        this.cofreOrigen = requireNonNull(origen);
+        this.cofreDestino = requireNonNull(destino);
         this.estado = EstadoPedido.NUEVO;
         this.prioridad = prioridad;
     }

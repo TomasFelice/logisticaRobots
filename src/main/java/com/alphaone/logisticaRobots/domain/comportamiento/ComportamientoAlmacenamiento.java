@@ -20,7 +20,7 @@ public class ComportamientoAlmacenamiento implements ComportamientoCofre {
 
     @Override
     public int getPrioridadSolicitud(Item item, CofreLogistico cofre) {
-        return 1; // Prioridad baja
+        return 0; // No aplica
     }
 
     @Override
