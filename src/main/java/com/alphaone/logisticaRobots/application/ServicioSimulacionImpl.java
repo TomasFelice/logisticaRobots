@@ -3,6 +3,7 @@ package com.alphaone.logisticaRobots.application;
 import com.alphaone.logisticaRobots.application.dto.*;
 import com.alphaone.logisticaRobots.domain.*;
 import com.alphaone.logisticaRobots.domain.comportamiento.*;
+import com.alphaone.logisticaRobots.domain.pathfinding.GrillaEspacial;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
 import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
@@ -19,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -181,10 +183,10 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
 
         try {
-            // Usar el configLoader inyectado
-            ConfiguracionSimulacionDTO configuracion = configLoader.cargarConfiguracion();
+            // Usar el configLoader inyectado con el archivo específico
+            ConfiguracionSimulacionDTO configuracion = configLoader.cargarConfiguracion(archivoConfig);
 
-            // Resto del código igual...
+            // Procesar la configuración
             procesarConfiguracion(configuracion, archivoConfig);
 
         } catch (IOException e) {
@@ -198,38 +200,90 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     // Método auxiliar para procesamiento de configuración (extrae lógica común)
     private void procesarConfiguracion(ConfiguracionSimulacionDTO configuracion, File archivoConfig) {
-        // Crear nueva red y cargar según la configuración
-        this.redLogistica = new RedLogistica();
-
         // Configurar dimensiones de la grilla
         if (configuracion.dimensionGrilla() != null) {
             this.anchoGrilla = configuracion.dimensionGrilla().ancho();
             this.altoGrilla = configuracion.dimensionGrilla().alto();
         }
+        GrillaEspacial grilla = new GrillaEspacial(new Punto(0, 0), anchoGrilla, altoGrilla);
+
+        // Crear colecciones temporales para cargar todas las entidades
+        Set<Robopuerto> robopuertos = new HashSet<>();
+        Set<CofreLogistico> cofres = new HashSet<>();
+        Set<RobotLogistico> robots = new HashSet<>();
+        List<Pedido> pedidos = new ArrayList<>();
 
         // Cargar robopuertos
         if (configuracion.robopuertos() != null) {
-            configuracion.robopuertos().forEach(this::cargarRobopuerto);
+            for (RobopuertoDTO rpDTO : configuracion.robopuertos()) {
+                Robopuerto robopuerto = new Robopuerto(
+                    rpDTO.id(),
+                    new Punto(rpDTO.posicion().x(), rpDTO.posicion().y()),
+                    rpDTO.alcance(),
+                    rpDTO.tasaRecarga()
+                );
+                robopuertos.add(robopuerto);
+            }
         }
 
         // Cargar cofres
         if (configuracion.cofres() != null) {
-            configuracion.cofres().forEach(this::cargarCofre);
+            for (CofreDTO cofreDTO : configuracion.cofres()) {
+                CofreLogistico cofre = crearCofreSegunTipo(
+                    cofreDTO.id(),
+                    new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y()),
+                    cofreDTO.capacidadMaxima(),
+                    cofreDTO.comportamientoDefecto(),
+                    cofreDTO.tiposComportamientoPorItem()
+                );
+                
+                // Cargar inventario inicial si existe
+                if (cofreDTO.inventario() != null) {
+                    cofreDTO.inventario().entrySet().forEach(entry -> {
+                        Item item = new Item(entry.getKey(), entry.getKey());
+                        cofre.agregarItem(item, entry.getValue());
+                    });
+                }
+                
+                cofres.add(cofre);
+            }
         }
 
         // Cargar robots
         if (configuracion.robots() != null) {
-            configuracion.robots().forEach(this::cargarRobot);
+            for (RobotDTO robotDTO : configuracion.robots()) {
+                // Buscar el robopuerto base del robot
+                Robopuerto robopuertoBase = null;
+                for (Robopuerto rp : robopuertos) {
+                    if (rp.getPosicion().equals(new Punto(robotDTO.posicion().x(), robotDTO.posicion().y()))) {
+                        robopuertoBase = rp;
+                        break;
+                    }
+                }
+                if (robopuertoBase == null && !robopuertos.isEmpty()) {
+                    robopuertoBase = robopuertos.iterator().next(); // Usar el primero como fallback
+                }
+
+                RobotLogistico robot = new RobotLogistico(
+                    Integer.parseInt(robotDTO.id()),
+                    new Punto(robotDTO.posicion().x(), robotDTO.posicion().y()),
+                    robopuertoBase,
+                    (int) robotDTO.bateriaMaxima(),
+                    robotDTO.capacidadCarga()
+                );
+                robots.add(robot);
+            }
         }
 
-        // Cargar pedidos - generar automáticamente desde los cofres
-        cargarPedidosDesdeConfiguracion(configuracion);
+        // Cargar pedidos desde configuración JSON
+        cargarPedidosDesdeConfiguracion(configuracion, cofres, pedidos);
+
+        // Crear la red logística con todas las entidades cargadas
+        this.redLogistica = new RedLogistica(robopuertos, grilla, cofres, robots, pedidos);
 
         // Establecer velocidad de simulación
         velocidadSimulacion = configuracion.velocidadSimulacion() > 0 ?
                 configuracion.velocidadSimulacion() : 1000;
-
-        // TODO: Revisar si hay que hacer algo con el planificador aca.
 
         // Actualizar estado
         this.archivoConfigActual = archivoConfig;
@@ -241,184 +295,105 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         logger.info("Configuración cargada desde {}", archivoConfig.getPath());
     }
 
-    // Método auxiliar para cargar pedidos desde la configuración
-    // Puede cargar pedidos directamente desde el JSON o generarlos basados en comportamientos
-    private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion) {
+    // Método auxiliar para cargar pedidos desde la configuración JSON
+    private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion, Set<CofreLogistico> cofres, List<Pedido> pedidosGenerados) {
         if (configuracion.cofres() == null || configuracion.cofres().isEmpty()) {
             return;
         }
 
-        List<Pedido> pedidosGenerados = new ArrayList<>();
-
-         // Intentar cargar pedidos desde el archivo JSON
-        try {
-            // Usar el mismo archivo que se usó para cargar la configuración
-            File archivoConfig = archivoConfigActual;
-            if (archivoConfig == null || !archivoConfig.exists()) {
-                // Si no hay archivo, usar el predeterminado
-                archivoConfig = configLoader.getConfigFile();
-            }
-
-            if (archivoConfig != null && archivoConfig.exists()) {
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode rootNode = objectMapper.readTree(archivoConfig);
-
-                // Verificar si hay pedidos en el JSON
-                if (rootNode.has("pedidos") && rootNode.get("pedidos").isArray()) {
-                    ArrayNode pedidosArray = (ArrayNode) rootNode.get("pedidos");
-
-                    for (JsonNode pedidoNode : pedidosArray) {
-                        String itemNombre = pedidoNode.has("itemNombre") ? 
-                                pedidoNode.get("itemNombre").asText() : "";
-                        int cantidad = pedidoNode.has("cantidad") ? 
-                                pedidoNode.get("cantidad").asInt() : 1; //Por defecto 1 si no viene valor
-                        String cofreDestinoId = pedidoNode.has("cofreDestinoId") ? 
-                                pedidoNode.get("cofreDestinoId").asText() : "";
-
-                        // Buscar el cofre destino
-                        CofreLogistico cofreDestino = redLogistica.buscarCofrePorId(cofreDestinoId);
-                        if (cofreDestino == null) {
-                            logger.warn("No se encontró el cofre destino con ID: {}", cofreDestinoId);
-                            continue;
-                        }
-
-                        // Crear el item
-                        Item item = new Item(itemNombre, itemNombre);
-
-                        // Buscar cofres origen que pueda ofrecer este item
-                        List<CofreLogistico> cofresOrigen = new ArrayList<>();
-                        for (CofreLogistico cofre : redLogistica.getCofres()) {
-                            if (cofre.puedeOfrecer(item, cantidad) && !cofre.equals(cofreDestino)) {
-                                cofresOrigen.add(cofre);
-                            }
-                        }
-
-                        // Ordeno cofresOrigen por prioridad, descartando los prioridad 0 (no aplican)
-                        cofresOrigen.removeIf(cofre -> cofre.getPrioridadSolicitud(item) == 0);
-                        cofresOrigen.sort((c1, c2) -> Integer.compare(c2.getPrioridadSolicitud(item), c1.getPrioridadSolicitud(item)));
-
-                        // Si no hay cofres origen, no se crea el pedido
-                        if (cofresOrigen.isEmpty()) {
-                            logger.warn("No se encontró un cofre origen que pueda ofrecer el item: {}", itemNombre);
-                            continue;
-                        }
-
-                        // Se crea el pedido con el cofre origen de mayor prioridad
-                        CofreLogistico cofreOrigen = cofresOrigen.get(0);
-                        Pedido.PrioridadPedido prioridadPorComportamiento = determinarPrioridadPorComportamiento(cofreOrigen, item);
-
-                        // Crear el pedido
-                        Pedido pedido = new Pedido(
-                                item,
-                                cantidad,
-                                cofreOrigen,
-                                cofreDestino,
-                                prioridadPorComportamiento
-                        );
-
-                        pedidosGenerados.add(pedido);
-                        logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
-                                cantidad,
-                                item.getNombre(),
-                                cofreOrigen.getId(),
-                                cofreDestino.getId(),
-                                prioridadPorComportamiento);
-                    }
-
-                    // Si se cargaron pedidos desde el JSON, agregarlos a la red logística y terminar
-                    if (!pedidosGenerados.isEmpty()) {
-                        for (Pedido pedido : pedidosGenerados) {
-                            this.redLogistica.agregarPedido(pedido);
-                        }
-                        logger.info("Se cargaron {} pedidos desde el archivo JSON", pedidosGenerados.size());
-                        return;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Error al cargar pedidos desde JSON", e);
-        }
-
-        // TODO:
-        //  @Nacho para mi de aca para abajo lo podemos borrar, deberiamos respetar siempre la estructura de archivo de config
-        //  en la que tengamos los pedidos
-        // Si no se pudieron cargar pedidos desde el JSON, generarlos basados en comportamientos
         pedidosGenerados.clear();
 
-        // Obtener todos los cofres de la red logística
-        List<CofreLogistico> cofres = new ArrayList<>(redLogistica.getCofres());
+        // Crear un mapa de cofres por ID para facilitar la búsqueda
+        Map<String, CofreLogistico> cofresPorId = cofres.stream()
+                .collect(Collectors.toMap(CofreLogistico::getId, c -> c));
 
-        // Crear un conjunto de todos los items disponibles en el sistema
-        Set<String> itemsDisponibles = new HashSet<>();
-        for (CofreLogistico cofre : cofres) {
-            for (Item item : cofre.getInventario().getItems()) {
-                itemsDisponibles.add(item.getNombre());
-            }
-        }
-
-        // Para cada item, buscar cofres que lo solicitan y cofres que lo ofrecen
-        for (String nombreItem : itemsDisponibles) {
-            Item item = new Item(nombreItem, nombreItem);
-
-            // Encontrar cofres que pueden solicitar este item
-            List<CofreLogistico> cofresQueSolicitan = new ArrayList<>();
-            for (CofreLogistico cofre : cofres) {
-                if (cofre.puedeSolicitar(item, 1)) {
-                    cofresQueSolicitan.add(cofre);
+        // Cargar pedidos del JSON
+        if (configuracion.pedidos() != null && !configuracion.pedidos().isEmpty()) {
+            for (PedidoDTO pedidoDTO : configuracion.pedidos()) {
+                // Buscar el cofre de destino
+                CofreLogistico cofreDestino = cofresPorId.get(pedidoDTO.cofreDestinoId());
+                if (cofreDestino == null) {
+                    logger.warn("No se encontró cofre destino con ID: {}", pedidoDTO.cofreDestinoId());
+                    continue;
                 }
-            }
 
-            // Encontrar cofres que pueden ofrecer este item
-            List<CofreLogistico> cofresQueOfrecen = new ArrayList<>();
-            for (CofreLogistico cofre : cofres) {
-                if (cofre.puedeOfrecer(item, 1)) {
-                    cofresQueOfrecen.add(cofre);
+                // Crear el item para validaciones
+                Item item = new Item(pedidoDTO.itemNombre(), pedidoDTO.itemNombre());
+
+                // Validar que el cofre destino pueda solicitar el item
+                if (!cofreDestino.puedeSolicitar(item, pedidoDTO.cantidad())) {
+                    logger.warn("El cofre destino {} no puede solicitar {} unidades de {}. Comportamiento: {}",
+                            cofreDestino.getId(), pedidoDTO.cantidad(), item.getNombre(), 
+                            cofreDestino.getTipoComportamiento(item));
+                    continue;
                 }
-            }
 
-            // Crear pedidos entre cofres que solicitan y cofres que ofrecen
-            for (CofreLogistico cofreDestino : cofresQueSolicitan) {
-                for (CofreLogistico cofreOrigen : cofresQueOfrecen) {
-                    // No crear pedidos entre el mismo cofre
-                    if (cofreOrigen.equals(cofreDestino)) {
-                        continue;
-                    }
-
-                    // Determinar la cantidad a solicitar (por simplicidad, usamos 1)
-                    // TODO: Validar la cantidad de items que muevo de un cofre a otro
-                    int cantidad = 1;
-
-                    // Determinar la prioridad basada en el comportamiento del cofre de origen
-                    int prioridadValor = cofreOrigen.getPrioridadSolicitud(item);
-                    Pedido.PrioridadPedido prioridad = getPrioridadPedido(prioridadValor);
-
-                    // Crear el pedido
-                    Pedido pedido = new Pedido(
-                            item,
-                            cantidad,
-                            cofreOrigen,
-                            cofreDestino,
-                            prioridad
-                    );
-
-                    pedidosGenerados.add(pedido);
-                    logger.debug("Pedido generado: {} de {} desde {} hasta {}. Prioridad {}",
-                            cantidad,
-                            item.getNombre(),
-                            cofreOrigen.getPosicion(),
-                            cofreDestino.getPosicion(),
-                            prioridad);
+                // Buscar dinámicamente el cofre origen que pueda ofrecer el item
+                CofreLogistico cofreOrigen = encontrarCofreOrigenParaItem(item, pedidoDTO.cantidad(), cofres);
+                if (cofreOrigen == null) {
+                    logger.warn("No se encontró cofre origen para item: {}", pedidoDTO.itemNombre());
+                    continue;
                 }
+
+                // Validar que origen y destino no sean el mismo cofre
+                if (cofreOrigen.equals(cofreDestino)) {
+                    logger.warn("No se puede crear pedido del cofre {} a sí mismo", cofreOrigen.getId());
+                    continue;
+                }
+
+                // Determinar prioridad
+                Pedido.PrioridadPedido prioridad = parsearPrioridad(pedidoDTO.prioridad());
+
+                // Crear el pedido
+                Pedido pedido = new Pedido(
+                        item,
+                        pedidoDTO.cantidad(),
+                        cofreOrigen,
+                        cofreDestino,
+                        prioridad
+                );
+
+                pedidosGenerados.add(pedido);
+                logger.debug("Pedido cargado desde JSON: {} de {} desde {} hasta {}. Prioridad {}",
+                        pedidoDTO.cantidad(),
+                        item.getNombre(),
+                        cofreOrigen.getId(),
+                        cofreDestino.getId(),
+                        prioridad);
             }
-        }
 
-        // Agregar los pedidos generados a la red logística
-        for (Pedido pedido : pedidosGenerados) {
-            this.redLogistica.agregarPedido(pedido);
+            logger.info("Se cargaron {} pedidos desde la configuración JSON", pedidosGenerados.size());
+        } else {
+            logger.info("No se encontraron pedidos en la configuración JSON");
         }
-
-        logger.info("Se generaron {} pedidos automáticamente basados en comportamientos", pedidosGenerados.size());
     }
+
+    /**
+     * Encuentra un cofre origen que pueda ofrecer el item especificado
+     */
+    private CofreLogistico encontrarCofreOrigenParaItem(Item item, int cantidad, Set<CofreLogistico> cofres) {
+        return cofres.stream()
+                .filter(cofre -> cofre.puedeOfrecer(item, cantidad))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Parsea la prioridad desde string a enum
+     */
+    private Pedido.PrioridadPedido parsearPrioridad(String prioridadStr) {
+        if (prioridadStr == null) return Pedido.PrioridadPedido.MEDIA;
+        
+        return switch (prioridadStr.toUpperCase()) {
+            case "ALTA" -> Pedido.PrioridadPedido.ALTA;
+            case "MEDIA" -> Pedido.PrioridadPedido.MEDIA;
+            case "BAJA" -> Pedido.PrioridadPedido.BAJA;
+            case "NO_APLICA" -> Pedido.PrioridadPedido.NO_APLICA;
+            default -> Pedido.PrioridadPedido.MEDIA;
+        };
+    }
+
+
 
     private static Pedido.PrioridadPedido getPrioridadPedido(int prioridadValor) {
         Pedido.PrioridadPedido prioridad;
@@ -461,47 +436,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
     }
 
-    // Métodos auxiliares para cargar cada tipo de entidad
-    private void cargarRobopuerto(RobopuertoDTO rpDTO) {
-        Punto posicion = new Punto(rpDTO.posicion().x(), rpDTO.posicion().y());
-        Robopuerto robopuerto = new Robopuerto(rpDTO.id(), posicion, rpDTO.alcance(), rpDTO.tasaRecarga());
-        redLogistica.agregarRobopuerto(robopuerto);
-    }
 
-    private void cargarCofre(CofreDTO cofreDTO) {
-        Punto posicion = new Punto(cofreDTO.posicion().x(), cofreDTO.posicion().y());
-        CofreLogistico cofre = crearCofreSegunTipo(
-                cofreDTO.id(), posicion, cofreDTO.capacidadMaxima(),
-                cofreDTO.comportamientoDefecto(), cofreDTO.tiposComportamientoPorItem());
-
-        // Cargar inventario inicial si existe
-        if (cofreDTO.inventario() != null) {
-            cofreDTO.inventario().entrySet().forEach(entry -> {
-                Item item = new Item(entry.getKey(), entry.getKey());
-                cofre.agregarItem(item, entry.getValue());
-            });
-        }
-
-        redLogistica.agregarCofre(cofre);
-    }
-
-    private void cargarRobot(RobotDTO robotDTO) {
-        Punto posicion = new Punto(robotDTO.posicion().x(), robotDTO.posicion().y());
-        Robopuerto robopuertoBase = redLogistica.getRobopuertoMasCercano(posicion);
-
-        if (robopuertoBase == null) {
-            throw new IllegalStateException("No se encontró robopuerto cercano para robot en " + posicion);
-        }
-
-        RobotLogistico robot = new RobotLogistico(
-                Integer.parseInt(robotDTO.id()),
-                posicion,
-                robopuertoBase,
-                (int) robotDTO.bateriaMaxima(),
-                robotDTO.capacidadCarga());
-
-        redLogistica.agregarRobot(robot);
-    }
 
     private CofreLogistico crearCofreSegunTipo(String id, Punto posicion, int capacidad,
                                                String comportamientoPorDefecto,
@@ -563,7 +498,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
             // Convertir carga a Map<String, Integer>
             Map<String, Integer> itemsEnCarga = new HashMap<>();
-            itemsEnCarga.put(String.valueOf(robot.getId()), robot.getBateriaActual());
+            for (Map.Entry<Item, Integer> entry : robot.getCargaActual().entrySet()) {
+                itemsEnCarga.put(entry.getKey().getNombre(), entry.getValue());
+            }
 
 
             // Convertir la ruta si existe

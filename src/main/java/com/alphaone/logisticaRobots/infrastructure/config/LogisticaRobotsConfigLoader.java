@@ -4,6 +4,7 @@ import com.alphaone.logisticaRobots.application.dto.ConfiguracionSimulacionDTO;
 import com.alphaone.logisticaRobots.application.dto.CofreDTO;
 import com.alphaone.logisticaRobots.application.dto.DimensionGrillaDTO;
 import com.alphaone.logisticaRobots.application.dto.ItemCantidadDTO;
+import com.alphaone.logisticaRobots.application.dto.PedidoDTO;
 import com.alphaone.logisticaRobots.application.dto.PuntoDTO;
 import com.alphaone.logisticaRobots.application.dto.RobopuertoDTO;
 import com.alphaone.logisticaRobots.application.dto.RobotDTO;
@@ -240,11 +241,29 @@ public class LogisticaRobotsConfigLoader {
             }
         }
 
+        // Mapear pedidos
+        List<PedidoDTO> pedidos = new ArrayList<>();
+        if (rootNode.has("pedidos") && rootNode.get("pedidos").isArray()) {
+            ArrayNode pedidosArray = (ArrayNode) rootNode.get("pedidos");
+            for (JsonNode pedidoNode : pedidosArray) {
+                String id = pedidoNode.has("id") ? pedidoNode.get("id").asText() : "";
+                String itemNombre = pedidoNode.has("itemNombre") ? pedidoNode.get("itemNombre").asText() : "";
+                int cantidad = pedidoNode.has("cantidad") ? pedidoNode.get("cantidad").asInt() : 1;
+                String cofreDestinoId = pedidoNode.has("cofreDestinoId") ? pedidoNode.get("cofreDestinoId").asText() : "";
+                String prioridad = pedidoNode.has("prioridad") ? pedidoNode.get("prioridad").asText() : "MEDIA";
+
+                // Crear el DTO de pedido
+                PedidoDTO pedidoDTO = new PedidoDTO(id, itemNombre, cantidad, cofreDestinoId, prioridad);
+                pedidos.add(pedidoDTO);
+            }
+        }
+
         // Crear y retornar la configuración
         return new ConfiguracionSimulacionDTO(
                 robots, 
                 cofres, 
                 robopuertos, 
+                pedidos,
                 dimensionGrilla, 
                 1000 // Velocidad de simulación por defecto
         );

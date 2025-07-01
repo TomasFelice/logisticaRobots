@@ -2,28 +2,34 @@ package com.alphaone.logisticaRobots.domain.pathfinding;
 
 public class GrillaEspacial {
 
-    private Punto origen;
-    private double radio;
+    private final Punto origen;
+    private final int ancho;
+    private final int alto;
 
-    public GrillaEspacial(Punto origen, double radio){
+    public GrillaEspacial(Punto origen, int ancho, int alto) {
         this.origen = origen;
-        this.radio = radio;
+        this.ancho = ancho;
+        this.alto = alto;
     }
 
-    // Metodo que devuelve si un robot Logistico se encuentra dentro de la grilla espacial
-    public boolean dentroDeGrilla(Punto posRobotLogistico){
-        double dx = posRobotLogistico.getX() - this.origen.getX();
-        double dy = posRobotLogistico.getY() - this.origen.getY();
-        double distanciaCuadrada = dx*dx + dy*dy;
-
-        return distanciaCuadrada <= this.radio * this.radio;
+    // Método que devuelve si un punto está dentro de la grilla rectangular
+    public boolean dentroDeGrilla(Punto punto) {
+        int x = punto.getX();
+        int y = punto.getY();
+        int x0 = origen.getX();
+        int y0 = origen.getY();
+        return x >= x0 && x < x0 + ancho && y >= y0 && y < y0 + alto;
     }
 
     public Punto getOrigen() {
         return origen;
     }
 
-    public double getRadio() {
-        return radio;
+    public int getAncho() {
+        return ancho;
+    }
+
+    public int getAlto() {
+        return alto;
     }
 }

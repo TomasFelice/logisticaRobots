@@ -5,6 +5,7 @@ import com.alphaone.logisticaRobots.shared.ParametrosGenerales;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class RobotLogistico implements Ubicable {
     private final int id;
@@ -20,6 +21,7 @@ public class RobotLogistico implements Ubicable {
     private final List<Pedido> historialPedidos = new ArrayList<>();
 
     private Pedido pedidoActual;
+    private RedLogistica redLogistica; // Referencia a la red logística para verificaciones
 
     public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado) {
         this.id = id;
@@ -30,6 +32,18 @@ public class RobotLogistico implements Ubicable {
         this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
         this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
         this.pedidosEncolados = new LinkedList<>();
+    }
+
+    public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado, RedLogistica redLogistica) {
+        this.id = id;
+        this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
+        this.bateriaMaxima = validarBateria(bateriaMaxima);
+        this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
+        this.estado = EstadoRobot.ACTIVO; // com.alphaone.logisticaRobots.domain.Estado inicial
+        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
+        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
+        this.pedidosEncolados = new LinkedList<>();
+        this.redLogistica = redLogistica;
     }
 
     //Getters:
@@ -59,6 +73,25 @@ public class RobotLogistico implements Ubicable {
     public EstadoRobot getEstado() {return estado;}
     public List<Pedido> getHistorialPedidos() { return historialPedidos; }
     public Queue<Pedido> getPedidosPendientes() { return pedidosPendientes; }
+
+    /**
+     * Establece la referencia a la red logística para verificaciones de colisiones y alcance.
+     * 
+     * @param redLogistica La red logística
+     */
+    public void setRedLogistica(RedLogistica redLogistica) {
+        this.redLogistica = redLogistica;
+        System.out.println("Robot " + id + ": Red logística configurada");
+    }
+
+    /**
+     * Verifica si la red logística está configurada para este robot.
+     * 
+     * @return true si está configurada, false en caso contrario
+     */
+    public boolean tieneRedLogistica() {
+        return redLogistica != null;
+    }
 
     // Métodos para manejar los estados del robot
 
@@ -120,12 +153,32 @@ public class RobotLogistico implements Ubicable {
     }
 
     /**
+     * Verifica si dos puntos son ortogonalmente adyacentes
+     */
+    private boolean esAdyacente(Punto a, Punto b) {
+        int dx = Math.abs(a.getX() - b.getX());
+        int dy = Math.abs(a.getY() - b.getY());
+        return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+    }
+
+    /**
      * Continúa con el procesamiento del pedido actual.
+     * El robot se mueve 1 casillero por ciclo de ejecución.
+     * No se solapa con otros robots, robopuertos o cofres.
+     * No se sale del alcance de un robopuerto.
      * 
      * @return true si el pedido sigue en proceso, false si se completó o falló
      */
     private boolean continuarPedidoActual() {
         if (pedidoActual == null) {
+            return false;
+        }
+
+        // Verificar que la red logística esté configurada
+        if (!tieneRedLogistica()) {
+            System.out.println("Robot " + id + ": ERROR - No hay red logística configurada. No se pueden verificar colisiones ni alcance.");
+            pedidoActual.marcarFallido();
+            finalizarPedido();
             return false;
         }
 
@@ -144,106 +197,115 @@ public class RobotLogistico implements Ubicable {
         int cantidad = pedidoActual.getCantidad();
 
         // Estado del pedido: 
-        // 1. Moverse al cofre de origen
+        // 1. Moverse a una celda adyacente al cofre de origen
         // 2. Recoger los items
-        // 3. Moverse al cofre de destino
+        // 3. Moverse a una celda adyacente al cofre de destino
         // 4. Entregar los items
 
-        // Verificar si estamos en el cofre de origen
-        if (!posicion.equals(origen.getPosicion())) {
-            // Moverse hacia el cofre de origen
-            double distancia = posicion.distanciaHacia(origen.getPosicion());
-
-            // Si estamos muy cerca, llegamos directamente
-            if (distancia <= 1.0) {
-                setPosicion(origen.getPosicion());
-                System.out.println("Robot " + id + " llegó al cofre de origen " + origen.getId());
-            } else {
-                // Calcular cuánto nos movemos en este ciclo (máximo 5 unidades)
-                double movimiento = Math.min(5.0, distancia);
-
-                // Calcular nueva posición (movimiento parcial hacia el destino)
-                double porcentajeMovimiento = movimiento / distancia;
-                int newX = (int) (posicion.getX() + (origen.getPosicion().getX() - posicion.getX()) * porcentajeMovimiento);
-                int newY = (int) (posicion.getY() + (origen.getPosicion().getY() - posicion.getY()) * porcentajeMovimiento);
-
-                setPosicion(new Punto(newX, newY));
-
-                // Consumir batería basado en la distancia recorrida
-                int consumoBateria = (int) Math.ceil(movimiento * ParametrosGenerales.FACTOR_CONSUMO);
-                try {
-                    consumirBateria(consumoBateria);
-                    System.out.println("Robot " + id + " moviéndose hacia cofre origen. Posición: " + posicion + 
-                                      ", Batería: " + bateriaActual + "/" + bateriaMaxima);
-                } catch (IllegalStateException e) {
-                    pedidoActual.marcarFallido();
-                    finalizarPedido();
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // Si estamos en el cofre de origen pero no hemos cargado los items
-        if (posicion.equals(origen.getPosicion()) && !cargaActual.containsKey(item)) {
-            // Verificar si el cofre tiene suficientes items
-            if (origen.getInventario().getCantidad(item) >= cantidad) {
-                try {
-                    // Cargar el item desde el cofre
-                    if (origen.removerItem(item, cantidad)) {
-                        cargaActual.put(item, cantidad);
-                        System.out.println("Robot " + id + " cargó " + cantidad + " unidades de " + 
-                                          item.getNombre() + " desde " + origen.getId());
-
-                        // Consumir batería por la operación de carga
+        // 1. Moverse a una celda adyacente al cofre de origen
+        if (!cargaActual.containsKey(item)) {
+            if (!esAdyacente(posicion, origen.getPosicion())) {
+                // Si estamos muy cerca del origen, buscar una posición adyacente libre
+                if (posicion.distanciaHacia(origen.getPosicion()) <= 1.5) {
+                    Punto posicionAdyacente = encontrarPosicionAdyacenteLibre(origen.getPosicion());
+                    if (posicionAdyacente != null) {
+                        setPosicion(posicionAdyacente);
+                        System.out.println("Robot " + id + " llegó a una celda adyacente al cofre de origen " + origen.getId());
                         consumirBateria(2);
                     } else {
-                        // No se pudo remover el item (quizás otro robot lo tomó mientras tanto)
+                        System.out.println("Robot " + id + " no puede encontrar posición adyacente libre al origen.");
                         pedidoActual.marcarFallido();
                         finalizarPedido();
                         return false;
                     }
-                } catch (Exception e) {
+                } else {
+                    // Calcular el siguiente paso hacia el origen
+                    Punto siguientePaso = calcularSiguientePaso(posicion, origen.getPosicion());
+                    
+                    // Verificar que el siguiente paso es válido
+                    if (siguientePaso != null && esMovimientoValido(siguientePaso)) {
+                        setPosicion(siguientePaso);
+                        int consumoBateria = (int) Math.ceil(posicion.distanciaHacia(siguientePaso) * ParametrosGenerales.FACTOR_CONSUMO);
+                        try {
+                            consumirBateria(consumoBateria);
+                            System.out.println("Robot " + id + " moviéndose hacia cofre origen. Posición: " + posicion + ", Batería: " + bateriaActual + "/" + bateriaMaxima);
+                        } catch (IllegalStateException e) {
+                            pedidoActual.marcarFallido();
+                            finalizarPedido();
+                            return false;
+                        }
+                    } else {
+                        // No se puede mover, marcar como fallido
+                        System.out.println("Robot " + id + " no puede moverse hacia el origen. Posición bloqueada.");
+                        pedidoActual.marcarFallido();
+                        finalizarPedido();
+                        return false;
+                    }
+                }
+                return true;
+            }
+            
+            // 2. Recoger los items si está adyacente
+            if (esAdyacente(posicion, origen.getPosicion()) && !cargaActual.containsKey(item)) {
+                if (origen.getInventario().getCantidad(item) >= cantidad) {
+                    try {
+                        if (origen.removerItem(item, cantidad)) {
+                            cargaActual.put(item, cantidad);
+                            System.out.println("Robot " + id + " cargó " + cantidad + " unidades de " + item.getNombre() + " desde " + origen.getId());
+                            consumirBateria(2);
+                        } else {
+                            pedidoActual.marcarFallido();
+                            finalizarPedido();
+                            return false;
+                        }
+                    } catch (Exception e) {
+                        pedidoActual.marcarFallido();
+                        finalizarPedido();
+                        return false;
+                    }
+                } else {
+                    System.out.println("Robot " + id + " no pudo cargar items. Cantidad insuficiente en " + origen.getId());
+                    pedidoActual.marcarFallido();
+                    finalizarPedido();
+                    return false;
+                }
+            }
+        }
+
+        // 3. Moverse a una celda adyacente al cofre de destino
+        if (cargaActual.containsKey(item) && !esAdyacente(posicion, destino.getPosicion())) {
+            // Si estamos muy cerca del destino, buscar una posición adyacente libre
+            if (posicion.distanciaHacia(destino.getPosicion()) <= 1.5) {
+                Punto posicionAdyacente = encontrarPosicionAdyacenteLibre(destino.getPosicion());
+                if (posicionAdyacente != null) {
+                    setPosicion(posicionAdyacente);
+                    System.out.println("Robot " + id + " llegó a una celda adyacente al cofre de destino " + destino.getId());
+                    consumirBateria(2);
+                } else {
+                    System.out.println("Robot " + id + " no puede encontrar posición adyacente libre al destino.");
                     pedidoActual.marcarFallido();
                     finalizarPedido();
                     return false;
                 }
             } else {
-                // No hay suficientes items
-                System.out.println("Robot " + id + " no pudo cargar items. Cantidad insuficiente en " + origen.getId());
-                pedidoActual.marcarFallido();
-                finalizarPedido();
-                return false;
-            }
-        }
-
-        // Si ya cargamos los items pero no estamos en el destino
-        if (cargaActual.containsKey(item) && !posicion.equals(destino.getPosicion())) {
-            // Moverse hacia el cofre de destino
-            double distancia = posicion.distanciaHacia(destino.getPosicion());
-
-            // Si estamos muy cerca, llegamos directamente
-            if (distancia <= 1.0) {
-                setPosicion(destino.getPosicion());
-                System.out.println("Robot " + id + " llegó al cofre de destino " + destino.getId());
-            } else {
-                // Calcular cuánto nos movemos en este ciclo (máximo 5 unidades)
-                double movimiento = Math.min(5.0, distancia);
-
-                // Calcular nueva posición (movimiento parcial hacia el destino)
-                double porcentajeMovimiento = movimiento / distancia;
-                int newX = (int) (posicion.getX() + (destino.getPosicion().getX() - posicion.getX()) * porcentajeMovimiento);
-                int newY = (int) (posicion.getY() + (destino.getPosicion().getY() - posicion.getY()) * porcentajeMovimiento);
-
-                setPosicion(new Punto(newX, newY));
-
-                // Consumir batería basado en la distancia recorrida (más consumo por llevar carga)
-                int consumoBateria = (int) Math.ceil(movimiento * ParametrosGenerales.FACTOR_CONSUMO * 1.5); // 50% más de consumo por llevar carga
-                try {
-                    consumirBateria(consumoBateria);
-                    System.out.println("Robot " + id + " moviéndose hacia cofre destino. Posición: " + posicion + 
-                                      ", Batería: " + bateriaActual + "/" + bateriaMaxima);
-                } catch (IllegalStateException e) {
+                // Calcular el siguiente paso hacia el destino
+                Punto siguientePaso = calcularSiguientePaso(posicion, destino.getPosicion());
+                
+                // Verificar que el siguiente paso es válido
+                if (siguientePaso != null && esMovimientoValido(siguientePaso)) {
+                    setPosicion(siguientePaso);
+                    int consumoBateria = (int) Math.ceil(posicion.distanciaHacia(siguientePaso) * ParametrosGenerales.FACTOR_CONSUMO * 1.5);
+                    try {
+                        consumirBateria(consumoBateria);
+                        System.out.println("Robot " + id + " moviéndose hacia cofre destino. Posición: " + posicion + ", Batería: " + bateriaActual + "/" + bateriaMaxima);
+                    } catch (IllegalStateException e) {
+                        pedidoActual.marcarFallido();
+                        finalizarPedido();
+                        return false;
+                    }
+                } else {
+                    // No se puede mover, marcar como fallido
+                    System.out.println("Robot " + id + " no puede moverse hacia el destino. Posición bloqueada.");
                     pedidoActual.marcarFallido();
                     finalizarPedido();
                     return false;
@@ -252,27 +314,18 @@ public class RobotLogistico implements Ubicable {
             return true;
         }
 
-        // Si estamos en el destino y tenemos los items, entregarlos
-        if (posicion.equals(destino.getPosicion()) && cargaActual.containsKey(item)) {
+        // 4. Entregar los items si está adyacente al destino
+        if (cargaActual.containsKey(item) && esAdyacente(posicion, destino.getPosicion())) {
             try {
-                // Entregar los items al cofre destino
                 int cantidadEntrega = cargaActual.get(item);
                 if (destino.agregarItem(item, cantidadEntrega)) {
-                    // Limpiar la carga del robot
                     cargaActual.remove(item);
-
-                    // Marcar el pedido como completado
                     pedidoActual.marcarCompletado();
-                    System.out.println("Robot " + id + " entregó " + cantidadEntrega + " unidades de " + 
-                                      item.getNombre() + " a " + destino.getId() + ". Pedido completado.");
-
-                    // Consumir batería por la operación de descarga
+                    System.out.println("Robot " + id + " entregó " + cantidadEntrega + " unidades de " + item.getNombre() + " a " + destino.getId() + ". Pedido completado.");
                     consumirBateria(2);
-
                     finalizarPedido();
                     return false;
                 } else {
-                    // No se pudo entregar (quizás el cofre está lleno)
                     System.out.println("Robot " + id + " no pudo entregar items. Cofre " + destino.getId() + " sin espacio.");
                     pedidoActual.marcarFallido();
                     finalizarPedido();
@@ -290,6 +343,253 @@ public class RobotLogistico implements Ubicable {
         pedidoActual.marcarFallido();
         finalizarPedido();
         return false;
+    }
+
+    /**
+     * Calcula el siguiente paso hacia un destino, moviéndose solo 1 casillero.
+     * Prioriza movimientos que mantengan al robot dentro del alcance de los robopuertos.
+     * 
+     * @param posicionActual Posición actual del robot
+     * @param destino Posición de destino
+     * @return Siguiente posición, o null si no se puede mover
+     */
+    private Punto calcularSiguientePaso(Punto posicionActual, Punto destino) {
+        // Si ya estamos en el destino, no hay movimiento
+        if (posicionActual.equals(destino)) {
+            return null;
+        }
+        
+        // Calcular dirección hacia el destino
+        int dx = Integer.compare(destino.getX(), posicionActual.getX());
+        int dy = Integer.compare(destino.getY(), posicionActual.getY());
+        
+        // Generar posibles movimientos
+        List<Punto> movimientosPosibles = new ArrayList<>();
+        
+        // Movimiento horizontal
+        if (dx != 0) {
+            movimientosPosibles.add(new Punto(posicionActual.getX() + dx, posicionActual.getY()));
+        }
+        
+        // Movimiento vertical
+        if (dy != 0) {
+            movimientosPosibles.add(new Punto(posicionActual.getX(), posicionActual.getY() + dy));
+        }
+        
+        // Si no hay movimientos posibles, retornar null
+        if (movimientosPosibles.isEmpty()) {
+            return null;
+        }
+        
+        // Filtrar movimientos válidos
+        List<Punto> movimientosValidos = movimientosPosibles.stream()
+                .filter(this::esMovimientoValido)
+                .collect(Collectors.toList());
+        
+        // Si no hay movimientos válidos, retornar null
+        if (movimientosValidos.isEmpty()) {
+            System.out.println("Robot " + id + ": No hay movimientos válidos hacia " + destino);
+            return null;
+        }
+        
+        // Elegir el movimiento que más se acerque al destino
+        Punto mejorMovimiento = movimientosValidos.stream()
+                .min(Comparator.comparingDouble(p -> p.distanciaHacia(destino)))
+                .orElse(movimientosValidos.get(0));
+        
+        System.out.println("Robot " + id + ": Movimiento seleccionado hacia " + mejorMovimiento + " (destino: " + destino + ")");
+        return mejorMovimiento;
+    }
+
+    /**
+     * Verifica si un movimiento es válido (no hay colisiones y está dentro del alcance).
+     * 
+     * @param nuevaPosicion Nueva posición a verificar
+     * @return true si el movimiento es válido, false en caso contrario
+     */
+    private boolean esMovimientoValido(Punto nuevaPosicion) {
+        System.out.println("Robot " + id + ": Verificando movimiento a posición " + nuevaPosicion);
+        
+        // Verificar que no se solape con otros robots
+        if (hayRobotEnPosicion(nuevaPosicion)) {
+            System.out.println("Robot " + id + ": Movimiento inválido - colisión con robot");
+            return false;
+        }
+        
+        // Verificar que no se solape con robopuertos (a menos que deba frenar a recargar)
+        if (hayRobopuertoEnPosicion(nuevaPosicion) && !necesitaRecargar()) {
+            System.out.println("Robot " + id + ": Movimiento inválido - colisión con robopuerto (no necesita recargar)");
+            return false;
+        }
+        
+        // Verificar que no se solape con cofres
+        if (hayCofreEnPosicion(nuevaPosicion)) {
+            System.out.println("Robot " + id + ": Movimiento inválido - colisión con cofre");
+            return false;
+        }
+        
+        // Verificar que no se salga del alcance de un robopuerto
+        if (!estaDentroDelAlcanceDeRobopuerto(nuevaPosicion)) {
+            System.out.println("Robot " + id + ": Movimiento inválido - fuera del alcance de robopuertos");
+            return false;
+        }
+        
+        // Verificar que pueda regresar a un robopuerto desde la nueva posición
+        if (!puedeRegresarARobopuerto(nuevaPosicion)) {
+            System.out.println("Robot " + id + ": Movimiento inválido - no puede regresar a robopuerto desde " + nuevaPosicion);
+            return false;
+        }
+        
+        System.out.println("Robot " + id + ": Movimiento válido a posición " + nuevaPosicion);
+        return true;
+    }
+
+    /**
+     * Verifica si hay un robot en la posición especificada.
+     * 
+     * @param posicion Posición a verificar
+     * @return true si hay un robot, false en caso contrario
+     */
+    private boolean hayRobotEnPosicion(Punto posicion) {
+        if (redLogistica == null) {
+            System.out.println("Robot " + id + ": No hay red logística para verificar colisiones con robots");
+            return false; // Si no hay red, asumimos que no hay colisiones
+        }
+        
+        boolean hayColision = redLogistica.getRobotsLogisticos().stream()
+                .anyMatch(robot -> robot.getPosicion().equals(posicion) && !robot.equals(this));
+        
+        if (hayColision) {
+            System.out.println("Robot " + id + ": Colisión detectada con otro robot en posición " + posicion);
+        }
+        
+        return hayColision;
+    }
+
+    /**
+     * Verifica si hay un robopuerto en la posición especificada.
+     * 
+     * @param posicion Posición a verificar
+     * @return true si hay un robopuerto, false en caso contrario
+     */
+    private boolean hayRobopuertoEnPosicion(Punto posicion) {
+        if (redLogistica == null) {
+            System.out.println("Robot " + id + ": No hay red logística para verificar colisiones con robopuertos");
+            return false; // Si no hay red, asumimos que no hay colisiones
+        }
+        
+        boolean hayColision = redLogistica.getRobopuertos().stream()
+                .anyMatch(robopuerto -> robopuerto.getPosicion().equals(posicion));
+        
+        if (hayColision) {
+            System.out.println("Robot " + id + ": Colisión detectada con robopuerto en posición " + posicion);
+        }
+        
+        return hayColision;
+    }
+
+    /**
+     * Verifica si hay un cofre en la posición especificada.
+     * 
+     * @param posicion Posición a verificar
+     * @return true si hay un cofre, false en caso contrario
+     */
+    private boolean hayCofreEnPosicion(Punto posicion) {
+        if (redLogistica == null) {
+            System.out.println("Robot " + id + ": No hay red logística para verificar colisiones con cofres");
+            return false; // Si no hay red, asumimos que no hay colisiones
+        }
+        
+        boolean hayColision = redLogistica.getCofres().stream()
+                .anyMatch(cofre -> cofre.getPosicion().equals(posicion));
+        
+        if (hayColision) {
+            System.out.println("Robot " + id + ": Colisión detectada con cofre en posición " + posicion);
+        }
+        
+        return hayColision;
+    }
+
+    /**
+     * Verifica si el robot necesita recargar.
+     * 
+     * @return true si necesita recargar, false en caso contrario
+     */
+    private boolean necesitaRecargar() {
+        return bateriaActual < bateriaMaxima * 0.2; // Menos del 20% de batería
+    }
+
+    /**
+     * Verifica si una posición está dentro del alcance de algún robopuerto.
+     * 
+     * @param posicion Posición a verificar
+     * @return true si está dentro del alcance, false en caso contrario
+     */
+    private boolean estaDentroDelAlcanceDeRobopuerto(Punto posicion) {
+        if (redLogistica == null) {
+            System.out.println("Robot " + id + ": No hay red logística para verificar alcance de robopuertos");
+            return true; // Si no hay red, asumimos que siempre está dentro del alcance
+        }
+        
+        boolean dentroDelAlcance = redLogistica.getRobopuertos().stream()
+                .anyMatch(robopuerto -> robopuerto.estaEnCobertura(posicion));
+        
+        if (!dentroDelAlcance) {
+            System.out.println("Robot " + id + ": Posición " + posicion + " está fuera del alcance de todos los robopuertos");
+        }
+        
+        return dentroDelAlcance;
+    }
+
+    /**
+     * Verifica si el robot puede regresar a un robopuerto desde una posición dada.
+     * Esto es importante para asegurar que el robot no se quede atrapado.
+     * 
+     * @param posicion Posición desde donde verificar
+     * @return true si puede regresar, false en caso contrario
+     */
+    private boolean puedeRegresarARobopuerto(Punto posicion) {
+        if (redLogistica == null) {
+            return true; // Si no hay red, asumimos que puede regresar
+        }
+        
+        // Buscar el robopuerto más cercano
+        Robopuerto robopuertoMasCercano = redLogistica.getRobopuertoMasCercano(posicion);
+        if (robopuertoMasCercano == null) {
+            return false; // No hay robopuertos
+        }
+        
+        // Verificar que esté dentro del alcance
+        if (!robopuertoMasCercano.estaEnCobertura(posicion)) {
+            return false;
+        }
+        
+        // Verificar que tenga suficiente batería para llegar al robopuerto
+        double distancia = posicion.distanciaHacia(robopuertoMasCercano.getPosicion());
+        int bateriaNecesaria = (int) Math.ceil(distancia * ParametrosGenerales.FACTOR_CONSUMO);
+        
+        return tieneSuficienteBateria(bateriaNecesaria);
+    }
+
+    /**
+     * Encuentra una posición adyacente libre a un punto dado.
+     * 
+     * @param punto Punto central
+     * @return Posición adyacente libre, o null si no hay ninguna disponible
+     */
+    private Punto encontrarPosicionAdyacenteLibre(Punto punto) {
+        int[][] direcciones = {{1,0}, {-1,0}, {0,1}, {0,-1}};
+        
+        for (int[] dir : direcciones) {
+            Punto adyacente = new Punto(punto.getX() + dir[0], punto.getY() + dir[1]);
+            if (esMovimientoValido(adyacente)) {
+                System.out.println("Robot " + id + ": Encontrada posición adyacente libre en " + adyacente);
+                return adyacente;
+            }
+        }
+        
+        System.out.println("Robot " + id + ": No se encontró ninguna posición adyacente libre a " + punto);
+        return null; // No hay posición adyacente libre
     }
 
     public void cambiarEstado(EstadoRobot nuevoEstado) {

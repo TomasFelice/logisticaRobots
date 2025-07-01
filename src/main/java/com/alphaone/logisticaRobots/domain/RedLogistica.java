@@ -24,7 +24,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         this.cofres = new HashSet<>();
         this.robotsLogisticos = new HashSet<>();
         this.pedidos = new ArrayList<>();
-        this.grillaEspacial = new GrillaEspacial(new Punto(0, 0), 100.0); // Origen en (0,0) con radio 100
+        this.grillaEspacial = new GrillaEspacial(new Punto(0, 0), 100, 100); // Origen en (0,0) con ancho 100 y alto 100
         this.planificador = new Planificador(robopuertos, grillaEspacial, cofres, robotsLogisticos, pedidos);
     }
 
@@ -75,6 +75,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
 
     public void agregarRobot(RobotLogistico robot) {
         this.robotsLogisticos.add(robot);
+        robot.setRedLogistica(this);
     }
 
     public void eliminarRobot(RobotLogistico robot) {
@@ -104,6 +105,9 @@ public class RedLogistica { // es el universo donde se componen las cosas
      * Procesa los pedidos pendientes y mueve los robots según sea necesario.
      */
     public void simularCiclo() {
+        // Verificar que todos los robots tengan la red configurada
+        verificarConfiguracionRobots();
+        
         // Utilizar el planificador para calcular las rutas más eficientes y asignar pedidos a robots
         boolean todosPedidosSatisfechos = planificador.ejecutarRutas();
 
@@ -147,6 +151,18 @@ public class RedLogistica { // es el universo donde se componen las cosas
         }
     }
 
+    /**
+     * Verifica que todos los robots tengan la red logística configurada.
+     * Si algún robot no la tiene, la configura automáticamente.
+     */
+    private void verificarConfiguracionRobots() {
+        for (RobotLogistico robot : robotsLogisticos) {
+            if (!robot.tieneRedLogistica()) {
+                System.out.println("Configurando red logística para robot " + robot.getId());
+                robot.setRedLogistica(this);
+            }
+        }
+    }
 
     /**
      * Indica que ya cumplió con todos los pedidos y no tiene más

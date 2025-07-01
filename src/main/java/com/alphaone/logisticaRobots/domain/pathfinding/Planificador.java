@@ -35,30 +35,68 @@ public class Planificador { //lo está haciendo tomi
     private void construirGrafo() {
         this.grafo = new Grafo();
 
-        // Agregar robopuertos como nodos
-        for (Robopuerto robopuerto : robopuertos) {
-            grafo.agregarNodo(new Nodo(robopuerto.getPosicion()));
-        }
+        // Crear un nodo por cada celda de la grilla espacial (dentro del rectángulo)
+        Map<Punto, Nodo> mapaNodos = new HashMap<>();
+        Punto origen = grillaEspacial.getOrigen();
+        int x0 = origen.getX();
+        int y0 = origen.getY();
+        int ancho = grillaEspacial.getAncho();
+        int alto = grillaEspacial.getAlto();
 
-        // Agregar cofres como nodos
-        for (CofreLogistico cofre : cofres) {
-            grafo.agregarNodo(new Nodo(cofre.getPosicion()));
-        }
+        // Primero, identificar las posiciones ocupadas por cofres, robots y robopuertos
+        Set<Punto> posicionesCofres = cofres.stream().map(CofreLogistico::getPosicion).collect(Collectors.toSet());
+        Set<Punto> posicionesRobots = robotsLogisticos.stream().map(RobotLogistico::getPosicion).collect(Collectors.toSet());
+        Map<Punto, RobotLogistico> robotsPorPosicion = robotsLogisticos.stream().collect(Collectors.toMap(RobotLogistico::getPosicion, r -> r));
+        Set<Punto> posicionesRobopuertos = robopuertos.stream().map(Robopuerto::getPosicion).collect(Collectors.toSet());
 
-        // Conectar nodos basado en la cobertura y accesibilidad
-        for (Nodo origen : grafo.getNodos()) {
-            for (Nodo destino : grafo.getNodos()) {
-                if (origen != destino) {
-                    // Verificar si están en alcance.
-                    // TODO: Revisar esta validacion tomando como premisa que debe verificar si un nodo tiene conexion posbile con otro
-                    if (estanConectados(origen.getNodo(), destino.getNodo())) {
-                        double distancia = origen.getNodo().distanciaHacia(destino.getNodo());
-                        double peso = distancia * factorConsumo;
-                        origen.agregarArista(new Arista(origen, destino, peso));
-                    }
+        // Crear nodos para cada celda válida
+        for (int dx = 0; dx < ancho; dx++) {
+            for (int dy = 0; dy < alto; dy++) {
+                Punto p = new Punto(x0 + dx, y0 + dy);
+                if (grillaEspacial.dentroDeGrilla(p)) {
+                    Nodo nodo = new Nodo(p);
+                    grafo.agregarNodo(nodo);
+                    mapaNodos.put(p, nodo);
                 }
             }
         }
+
+        // Conectar nodos ortogonalmente si ambas celdas son transitables
+        int[][] ortogonales = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+        for (Nodo nodo : grafo.getNodos()) {
+            Punto p = nodo.getNodo();
+            for (int[] dir : ortogonales) {
+                Punto vecino = new Punto(p.getX() + dir[0], p.getY() + dir[1]);
+                Nodo nodoVecino = mapaNodos.get(vecino);
+                if (nodoVecino != null && esTransitable(vecino, null, posicionesCofres, posicionesRobots, robotsPorPosicion, posicionesRobopuertos)) {
+                    double peso = p.distanciaHacia(vecino) * factorConsumo;
+                    nodo.agregarArista(new Arista(nodo, nodoVecino, peso));
+                }
+            }
+        }
+    }
+
+    /**
+     * Determina si una celda es transitable para un robot dado.
+     * Si robotPlanificador es null, se asume para construcción general del grafo.
+     */
+    private boolean esTransitable(Punto punto, RobotLogistico robotPlanificador, Set<Punto> posicionesCofres, Set<Punto> posicionesRobots, Map<Punto, RobotLogistico> robotsPorPosicion, Set<Punto> posicionesRobopuertos) {
+        // Cofres: la celda es obstáculo
+        if (posicionesCofres.contains(punto)) return false;
+        // Robots: la celda es obstáculo, salvo que sea el propio robot planificando
+        if (posicionesRobots.contains(punto)) {
+            if (robotPlanificador == null) return false;
+            RobotLogistico robotEnCelda = robotsPorPosicion.get(punto);
+            if (robotEnCelda != null && !robotEnCelda.equals(robotPlanificador)) return false;
+        }
+        // Robopuertos: obstáculo solo si hay un robot ACTIVO en la celda
+        if (posicionesRobopuertos.contains(punto)) {
+            RobotLogistico robotEnRobopuerto = robotsPorPosicion.get(punto);
+            if (robotEnRobopuerto != null && robotEnRobopuerto.getEstado() == EstadoRobot.ACTIVO) {
+                if (robotPlanificador == null || !robotEnRobopuerto.equals(robotPlanificador)) return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -205,9 +243,8 @@ public class Planificador { //lo está haciendo tomi
             List<Pedido> pedidosOrdenados = new ArrayList<>(pedidos);
             pedidosOrdenados.sort((p1, p2) -> {
                 // Comparar por prioridad (mayor a menor)
-                int comparacion = p2.getPrioridad().ordinal() - p1.getPrioridad().ordinal();
                 // Si tienen la misma prioridad, mantener el orden original
-                return comparacion != 0 ? comparacion : 0;
+                return p2.getPrioridad().ordinal() - p1.getPrioridad().ordinal();
             });
 
             // Filtrar pedidos que no están completados ni fallidos
@@ -230,7 +267,7 @@ public class Planificador { //lo está haciendo tomi
                 }
 
                 // Buscar el mejor robot para este pedido
-                RobotLogistico mejorRobot = encontrarMejorRobotParaPedido(pedido); //TODO: @tomi feli No encuentra el robot porque no encuentra el punto, metete adentro
+                RobotLogistico mejorRobot = encontrarMejorRobotParaPedido(pedido);
 
                 if (mejorRobot != null) {
                     // Asignar el pedido al robot
@@ -288,6 +325,22 @@ public class Planificador { //lo está haciendo tomi
     }
 
     /**
+     * Devuelve la lista de celdas ortogonalmente adyacentes y transitables a un punto dado (por ejemplo, un cofre).
+     */
+    private List<Nodo> obtenerAdyacentesTransitables(Punto punto, RobotLogistico robotPlanificador, Set<Punto> posicionesCofres, Set<Punto> posicionesRobots, Map<Punto, RobotLogistico> robotsPorPosicion, Set<Punto> posicionesRobopuertos) {
+        int[][] ortogonales = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+        List<Nodo> adyacentes = new ArrayList<>();
+        for (int[] dir : ortogonales) {
+            Punto ady = new Punto(punto.getX() + dir[0], punto.getY() + dir[1]);
+            Nodo nodoAdy = encontrarNodo(ady);
+            if (nodoAdy != null && esTransitable(ady, robotPlanificador, posicionesCofres, posicionesRobots, robotsPorPosicion, posicionesRobopuertos)) {
+                adyacentes.add(nodoAdy);
+            }
+        }
+        return adyacentes;
+    }
+
+    /**
      * Encuentra el mejor robot para un pedido específico.
      * Considera la proximidad, capacidad de batería y disponibilidad del robot.
      * También verifica si hay colisiones con otros robots.
@@ -323,6 +376,14 @@ public class Planificador { //lo está haciendo tomi
             }
         }
 
+        // Verificar que el destino también está dentro del alcance de algún robopuerto
+        boolean destinoAccesible = robopuertos.stream()
+                .anyMatch(robopuerto -> robopuerto.estaEnCobertura(destino.getPosicion()));
+        
+        if (!destinoAccesible) {
+            return null; // El destino no está dentro del alcance de ningún robopuerto
+        }
+
         // Priorizar robots que están en robopuertos cercanos al cofre origen
         if (!robopuertosCercanos.isEmpty()) {
             List<RobotLogistico> robotsEnRobopuertosCercanos = robotsDisponibles.stream()
@@ -336,12 +397,18 @@ public class Planificador { //lo está haciendo tomi
             }
         }
 
-        // Encontrar el nodo correspondiente al origen y destino
-        Nodo nodoOrigen = encontrarNodo(mejorOrigen.getPosicion());
-        Nodo nodoDestino = encontrarNodo(destino.getPosicion());
+        // Obtener sets y mapas de obstáculos actualizados
+        Set<Punto> posicionesCofres = cofres.stream().map(CofreLogistico::getPosicion).collect(Collectors.toSet());
+        Set<Punto> posicionesRobots = robotsLogisticos.stream().map(RobotLogistico::getPosicion).collect(Collectors.toSet());
+        Map<Punto, RobotLogistico> robotsPorPosicion = robotsLogisticos.stream().collect(Collectors.toMap(RobotLogistico::getPosicion, r -> r));
+        Set<Punto> posicionesRobopuertos = robopuertos.stream().map(Robopuerto::getPosicion).collect(Collectors.toSet());
 
-        if (nodoOrigen == null || nodoDestino == null) {
-            return null; // No se encontraron los nodos en el grafo
+        // Encontrar nodos adyacentes transitables al origen y destino (cofres)
+        List<Nodo> nodosAdyacentesOrigen = obtenerAdyacentesTransitables(mejorOrigen.getPosicion(), null, posicionesCofres, posicionesRobots, robotsPorPosicion, posicionesRobopuertos);
+        List<Nodo> nodosAdyacentesDestino = obtenerAdyacentesTransitables(destino.getPosicion(), null, posicionesCofres, posicionesRobots, robotsPorPosicion, posicionesRobopuertos);
+
+        if (nodosAdyacentesOrigen.isEmpty() || nodosAdyacentesDestino.isEmpty()) {
+            return null; // No hay acceso al cofre origen o destino
         }
 
         // Evaluar cada robot
@@ -350,43 +417,53 @@ public class Planificador { //lo está haciendo tomi
         List<Punto> mejorRuta = null;
 
         for (RobotLogistico robot : robotsDisponibles) {
-            // Encontrar el nodo correspondiente a la posición actual del robot
             Nodo nodoRobot = encontrarNodo(robot.getPosicion());
-
             if (nodoRobot == null) {
-                continue; // No se encontró el nodo del robot en el grafo
+                continue;
             }
 
-            // Calcular rutas óptimas desde la posición del robot
+            // Buscar la mejor ruta a cualquier adyacente al origen
             Map<Nodo, Ruta> rutasDesdeRobot = calcularRutasOptimas(nodoRobot);
-
-            // Verificar si hay ruta al origen
-            if (!rutasDesdeRobot.containsKey(nodoOrigen)) {
-                continue; // No hay ruta al origen
+            Nodo mejorNodoAdyOrigen = null;
+            Ruta mejorRutaRobotOrigen = null;
+            double mejorDistanciaRobotOrigen = Double.MAX_VALUE;
+            for (Nodo nodoAdy : nodosAdyacentesOrigen) {
+                Ruta ruta = rutasDesdeRobot.get(nodoAdy);
+                if (ruta != null) {
+                    double dist = nodoRobot.getNodo().distanciaHacia(nodoAdy.getNodo());
+                    if (dist < mejorDistanciaRobotOrigen) {
+                        mejorDistanciaRobotOrigen = dist;
+                        mejorNodoAdyOrigen = nodoAdy;
+                        mejorRutaRobotOrigen = ruta;
+                    }
+                }
             }
+            if (mejorRutaRobotOrigen == null) continue;
 
-            // Calcular rutas óptimas desde el origen
-            Map<Nodo, Ruta> rutasDesdeOrigen = calcularRutasOptimas(nodoOrigen);
-
-            // Verificar si hay ruta al destino
-            if (!rutasDesdeOrigen.containsKey(nodoDestino)) {
-                continue; // No hay ruta al destino
+            // Buscar la mejor ruta desde adyacente al origen a cualquier adyacente al destino
+            Map<Nodo, Ruta> rutasDesdeOrigen = calcularRutasOptimas(mejorNodoAdyOrigen);
+            Nodo mejorNodoAdyDestino = null;
+            Ruta mejorRutaOrigenDestino = null;
+            double mejorDistanciaOrigenDestino = Double.MAX_VALUE;
+            for (Nodo nodoAdy : nodosAdyacentesDestino) {
+                Ruta ruta = rutasDesdeOrigen.get(nodoAdy);
+                if (ruta != null) {
+                    double dist = mejorNodoAdyOrigen.getNodo().distanciaHacia(nodoAdy.getNodo());
+                    if (dist < mejorDistanciaOrigenDestino) {
+                        mejorDistanciaOrigenDestino = dist;
+                        mejorNodoAdyDestino = nodoAdy;
+                        mejorRutaOrigenDestino = ruta;
+                    }
+                }
             }
+            if (mejorRutaOrigenDestino == null) continue;
 
-            // Construir la ruta completa (robot -> origen -> destino)
+            // Construir la ruta completa (robot -> adyacente origen -> adyacente destino)
             List<Punto> rutaCompleta = new ArrayList<>();
-
-            // Agregar ruta de robot a origen
-            Ruta rutaRobotOrigen = rutasDesdeRobot.get(nodoOrigen);
-            if (rutaRobotOrigen != null) {
-                rutaCompleta.add(rutaRobotOrigen.getPuntoInicio());
-                rutaCompleta.add(rutaRobotOrigen.getPuntoFin());
-            }
-
-            // Agregar ruta de origen a destino
-            Ruta rutaOrigenDestino = rutasDesdeOrigen.get(nodoDestino);
-            if (rutaOrigenDestino != null && !rutaOrigenDestino.getPuntoFin().equals(rutaRobotOrigen.getPuntoFin())) {
-                rutaCompleta.add(rutaOrigenDestino.getPuntoFin());
+            rutaCompleta.add(mejorRutaRobotOrigen.getPuntoInicio());
+            rutaCompleta.add(mejorRutaRobotOrigen.getPuntoFin());
+            if (!mejorRutaOrigenDestino.getPuntoFin().equals(mejorRutaRobotOrigen.getPuntoFin())) {
+                rutaCompleta.add(mejorRutaOrigenDestino.getPuntoFin());
             }
 
             // Calcular distancia total
@@ -400,29 +477,28 @@ public class Planificador { //lo está haciendo tomi
 
             // Verificar si el robot tiene suficiente batería
             if (!robot.tieneSuficienteBateria((int) Math.ceil(consumoBateria))) {
-                // Verificar si hay un robopuerto cercano para recargar
                 boolean puedeRecargar = verificarPosibilidadRecarga(robot, mejorOrigen, destino, consumoBateria);
-
                 if (!puedeRecargar) {
-                    continue; // No puede completar la misión con la batería actual
+                    continue;
                 }
             }
 
             // Verificar si hay colisiones con otros robots
             boolean hayColision = verificarColisiones(robot, rutaCompleta);
             if (hayColision) {
-                continue; // Hay colisión con otro robot
+                continue;
+            }
+
+            // Verificar que toda la ruta esté dentro del alcance de algún robopuerto
+            if (!rutaDentroDelAlcance(rutaCompleta)) {
+                continue;
             }
 
             // Calcular puntuación (menor es mejor)
-            // Considerar: distancia, batería, capacidad de carga
             double puntuacion = distanciaTotal;
-
-            // Ajustar puntuación según la batería disponible (penalizar baterías bajas)
             double porcentajeBateria = (double) robot.getBateriaActual() / robot.getBateriaMaxima();
             puntuacion = puntuacion / porcentajeBateria;
 
-            // Verificar si este robot es mejor que el actual mejor
             if (puntuacion < mejorPuntuacion) {
                 mejorRobot = robot;
                 mejorPuntuacion = puntuacion;
@@ -430,7 +506,6 @@ public class Planificador { //lo está haciendo tomi
             }
         }
 
-        // Si se encontró un robot adecuado, registrar su ruta para evitar colisiones
         if (mejorRobot != null && mejorRuta != null) {
             rutasAsignadas.put(mejorRobot, mejorRuta);
         }
@@ -515,6 +590,7 @@ public class Planificador { //lo está haciendo tomi
 
     /**
      * Verifica si un robot puede recargar su batería en un robopuerto cercano para completar una misión.
+     * También verifica que el robot no se salga del alcance de los robopuertos.
      * 
      * @param robot El robot a verificar
      * @param origen El cofre de origen
@@ -536,6 +612,11 @@ public class Planificador { //lo está haciendo tomi
                 double distanciaOrigenDestino = origen.getPosicion().distanciaHacia(destino.getPosicion());
                 double consumoRestante = (distanciaRobopuertoOrigen + distanciaOrigenDestino) * factorConsumo;
 
+                // Verificar que el origen y destino están dentro del alcance del robopuerto
+                if (!robopuerto.estaEnCobertura(origen.getPosicion()) || !robopuerto.estaEnCobertura(destino.getPosicion())) {
+                    continue; // Este robopuerto no puede cubrir la misión
+                }
+
                 // Verificar si con batería completa puede completar la misión
                 if (robot.getBateriaMaxima() >= consumoRestante) {
                     return true;
@@ -554,17 +635,14 @@ public class Planificador { //lo está haciendo tomi
      * @return El nodo correspondiente, o null si no se encuentra
      */
     private Nodo encontrarNodo(Punto posicion) {
-        // Primero intentar encontrar una coincidencia exacta
         for (Nodo nodo : grafo.getNodos()) {
             if (nodo.getNodo().equals(posicion)) {
                 return nodo;
             }
         }
-
         // Si no hay coincidencia exacta, buscar el nodo más cercano
         Nodo nodoMasCercano = null;
         double distanciaMinima = Double.MAX_VALUE;
-
         for (Nodo nodo : grafo.getNodos()) {
             double distancia = nodo.getNodo().distanciaHacia(posicion);
             if (distancia < distanciaMinima) {
@@ -572,7 +650,23 @@ public class Planificador { //lo está haciendo tomi
                 nodoMasCercano = nodo;
             }
         }
-
         return nodoMasCercano;
+    }
+
+    /**
+     * Verifica si todos los puntos de una ruta están dentro del alcance de algún robopuerto.
+     * 
+     * @param ruta La ruta a verificar
+     * @return true si todos los puntos están dentro del alcance, false en caso contrario
+     */
+    private boolean rutaDentroDelAlcance(List<Punto> ruta) {
+        for (Punto punto : ruta) {
+            boolean puntoAccesible = robopuertos.stream()
+                    .anyMatch(robopuerto -> robopuerto.estaEnCobertura(punto));
+            if (!puntoAccesible) {
+                return false;
+            }
+        }
+        return true;
     }
 }
