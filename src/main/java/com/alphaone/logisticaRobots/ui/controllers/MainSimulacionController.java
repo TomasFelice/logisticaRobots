@@ -15,6 +15,7 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.scene.control.Slider;
+import javafx.scene.control.Alert;
 
 import java.io.File;
 import java.util.List;
@@ -75,6 +76,8 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
     private double lastMouseY;
     private boolean isPanning = false;
 
+    // Bandera para evitar mostrar múltiples veces la alerta de estado estable
+    private boolean alertaEstadoEstableMostrada = false;
 
     /**
      * Método de inicialización llamado por JavaFX después de que los campos FXML han sido inyectados.
@@ -205,6 +208,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             botonPausar.setDisable(true);
             botonAvanzarCiclo.setDisable(false);
             textAreaDetallesEntidad.setText("Simulación reseteada. Seleccione una entidad.");
+            showAlert(Alert.AlertType.INFORMATION, "Simulación reseteada", "La simulación ha sido reseteada correctamente.");
         }
     }
 
@@ -220,6 +224,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
     private void handleCargarConfiguracion() {
         if (servicioSimulacion == null) {
             textAreaDetallesEntidad.setText("Error: Servicio de simulación no disponible.");
+            showAlert(Alert.AlertType.ERROR, "Error de Simulación", "Servicio de simulación no disponible.");
             return;
         }
         FileChooser fileChooser = new FileChooser();
@@ -234,6 +239,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 servicioSimulacion.cargarConfiguracion(archivoSeleccionado);
                 // La actualización del estado y la UI vendrá por el observador
                 textAreaDetallesEntidad.setText("Configuración cargada desde: " + archivoSeleccionado.getName());
+                showAlert(Alert.AlertType.INFORMATION, "Configuración cargada", "Configuración cargada desde: " + archivoSeleccionado.getName());
                 botonIniciar.setDisable(false);
                 botonPausar.setDisable(true);
                 botonResetear.setDisable(false);
@@ -243,6 +249,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 System.err.println("Error al cargar la configuración: " + e.getMessage());
                 e.printStackTrace();
                 textAreaDetallesEntidad.setText("Error al cargar configuración: " + e.getMessage());
+                showAlert(Alert.AlertType.ERROR, "Error al cargar configuración", e.getMessage());
             }
         }
     }
@@ -261,6 +268,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 this.ultimosRobots = null;
                 this.ultimosCofres = null;
                 this.ultimosRobopuertos = null;
+                alertaEstadoEstableMostrada = false;
                 return;
             }
 
@@ -305,18 +313,29 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                     botonIniciar.setDisable(true);
                     botonPausar.setDisable(false);
                     botonAvanzarCiclo.setDisable(true);
+                    alertaEstadoEstableMostrada = false;
                     break;
                 case "PAUSADA":
                     botonIniciar.setDisable(false);
                     botonPausar.setDisable(true);
                     botonAvanzarCiclo.setDisable(false);
+                    alertaEstadoEstableMostrada = false;
                     break;
                 case "FINALIZADA_ESTABLE":
+                    botonIniciar.setDisable(false);
+                    botonPausar.setDisable(true);
+                    botonAvanzarCiclo.setDisable(false); // Permitir avanzar si está finalizada o error podría ser opcional
+                    if (!alertaEstadoEstableMostrada) {
+                        showAlert(Alert.AlertType.INFORMATION, "Simulación finalizada", "La simulación ha alcanzado un estado estable.");
+                        alertaEstadoEstableMostrada = true;
+                    }
+                    break;
                 case "ERROR":
                 case "NO_INICIADO": // Después de reset o carga
                     botonIniciar.setDisable(false);
                     botonPausar.setDisable(true);
                     botonAvanzarCiclo.setDisable(false); // Permitir avanzar si está finalizada o error podría ser opcional
+                    alertaEstadoEstableMostrada = false;
                     break;
                 default:
                     // com.alphaone.logisticaRobots.domain.Estado desconocido o inicial antes de cargar config
@@ -328,6 +347,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                         botonPausar.setDisable(true);
                     }
                     botonAvanzarCiclo.setDisable(dimensionGrilla == null); // Solo avanzar si hay grilla
+                    alertaEstadoEstableMostrada = false;
                     break;
             }
             botonResetear.setDisable(dimensionGrilla == null); // Solo resetear si hay algo cargado
@@ -667,7 +687,10 @@ private void dibujarRobot(RobotDTO robot) {
 
     // --- Manejo de Selección de Entidades ---
     private void handleCanvasClick(MouseEvent event) {
-        if (dimensionGrilla == null || servicioSimulacion == null) return;
+        if (dimensionGrilla == null || servicioSimulacion == null) {
+            showAlert(Alert.AlertType.WARNING, "Acción no permitida", "Debe cargar una configuración antes de interactuar con la grilla.");
+            return;
+        }
 
         double clickX = event.getX();
         double clickY = event.getY();
@@ -804,6 +827,7 @@ private void dibujarRobot(RobotDTO robot) {
     private void mostrarDetallesEntidad(DetallesEntidadDTO detalles) {
         if (detalles == null) {
             textAreaDetallesEntidad.setText("No se encontraron detalles para la entidad seleccionada.");
+            showAlert(Alert.AlertType.WARNING, "Sin detalles", "No se encontraron detalles para la entidad seleccionada.");
             return;
         }
 
@@ -862,5 +886,21 @@ private void dibujarRobot(RobotDTO robot) {
                 sb.append("Tipo de entidad desconocido.");
         }
         textAreaDetallesEntidad.setText(sb.toString());
+    }
+
+    /**
+     * Muestra una alerta de JavaFX al usuario.
+     * @param tipo Tipo de alerta (INFORMATION, WARNING, ERROR)
+     * @param titulo Título de la alerta
+     * @param mensaje Mensaje a mostrar
+     */
+    private void showAlert(Alert.AlertType tipo, String titulo, String mensaje) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(tipo);
+            alert.setTitle(titulo);
+            alert.setHeaderText(null);
+            alert.setContentText(mensaje);
+            alert.showAndWait();
+        });
     }
 }
