@@ -123,6 +123,13 @@ public class RedLogistica { // es el universo donde se componen las cosas
                 // Procesar el pedido actual del robot
                 robot.procesarSiguientePedido();
                 System.out.println("Robot " + robot + " procesando pedido");
+                // Si el robot NO tiene pedido actual ni pendientes, y está en un robopuerto, cambiar a PASIVO
+                boolean sinPedidos = robot.getPedidosPendientes().isEmpty() && robot.getHistorialPedidos().size() > 0 && robot.getEstado() == EstadoRobot.EN_MISION && robot.getRutaActual().isEmpty();
+                boolean enRobopuerto = robopuertos.stream().anyMatch(rp -> robot.getPosicion().equals(rp.getPosicion()));
+                if (sinPedidos && enRobopuerto) {
+                    robot.cambiarEstado(EstadoRobot.PASIVO);
+                    System.out.println("Robot " + robot + " llegó a robopuerto y pasa a PASIVO");
+                }
             } else if (robot.getEstado() == EstadoRobot.ACTIVO) {
                 // Si el robot está activo, intentar procesar un nuevo pedido
                 if (robot.procesarSiguientePedido()) {
@@ -175,13 +182,15 @@ public class RedLogistica { // es el universo donde se componen las cosas
         boolean pedidosPendientes = pedidos.stream()
                 .anyMatch(p -> p.getEstado() == Pedido.EstadoPedido.NUEVO || p.getEstado() == Pedido.EstadoPedido.EN_PROCESO);
 
-        // Verificar si hay robots en movimiento
-        // TODO: Validar que los estados del robot sean correctos para validar si es un estado estable o no.
-        boolean robotsEnMovimiento = robotsLogisticos.stream()
-                .anyMatch(r -> r.getEstado() == EstadoRobot.EN_MISION);
+        // Verificar que todos los robots estén en un robopuerto y en estado PASIVO, CARGANDO o ACTIVO
+        boolean todosRobotsEstables = robotsLogisticos.stream().allMatch(
+            robot ->
+                (robopuertos.stream().anyMatch(rp -> robot.getPosicion().equals(rp.getPosicion()))) &&
+                (robot.getEstado() == EstadoRobot.PASIVO || robot.getEstado() == EstadoRobot.CARGANDO || robot.getEstado() == EstadoRobot.ACTIVO)
+        );
 
-        // Si no hay pedidos pendientes ni robots en movimiento, el sistema está estable
-        return !pedidosPendientes && !robotsEnMovimiento;
+        // El sistema está estable solo si no hay pedidos pendientes y todos los robots están en robopuerto y en estado estable
+        return !pedidosPendientes && todosRobotsEstables;
     }
 
     /**

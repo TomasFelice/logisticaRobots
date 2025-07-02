@@ -125,7 +125,14 @@ public class RobotLogistico implements Ubicable {
     private void finalizarPedido() {
         historialPedidos.add(pedidoActual);
         pedidoActual = null;
-        cambiarEstado(EstadoRobot.ACTIVO);
+        // Si hay más pedidos pendientes, el robot seguirá en EN_MISION cuando tome el siguiente pedido
+        // Si NO hay más pedidos pendientes, el robot debe volver a un robopuerto y permanecer en EN_MISION hasta llegar
+        if (!pedidosPendientes.isEmpty()) {
+            cambiarEstado(EstadoRobot.ACTIVO); // Puede tomar otro pedido
+        } else {
+            // No cambiar a ACTIVO, queda en EN_MISION hasta llegar a un robopuerto
+            // El cambio a PASIVO se hará en RedLogistica.simularCiclo
+        }
     }
 
     /**
@@ -149,6 +156,27 @@ public class RobotLogistico implements Ubicable {
             return true;
         }
 
+        // Si no hay pedidos pendientes ni en proceso, pero el robot está en EN_MISION, debe volver a un robopuerto
+        if (getEstado() == EstadoRobot.EN_MISION && redLogistica != null) {
+            boolean enRobopuerto = redLogistica.getRobopuertos().stream().anyMatch(rp -> getPosicion().equals(rp.getPosicion()));
+            if (!enRobopuerto) {
+                Robopuerto robopuertoCercano = redLogistica.getRobopuertoMasCercano(getPosicion());
+                if (robopuertoCercano != null) {
+                    Punto destinoFinal = robopuertoCercano.getPosicion();
+                    Punto siguientePaso = calcularSiguientePaso(getPosicion(), destinoFinal);
+                    if (siguientePaso != null && esMovimientoValido(siguientePaso, destinoFinal)) {
+                        setPosicion(siguientePaso);
+                        int consumoBateria = (int) Math.ceil(getPosicion().distanciaHacia(siguientePaso) * ParametrosGenerales.FACTOR_CONSUMO);
+                        try {
+                            consumirBateria(consumoBateria);
+                            System.out.println("Robot " + id + " volviendo a robopuerto. Posición: " + getPosicion() + ", Batería: " + bateriaActual + "/" + bateriaMaxima);
+                        } catch (IllegalStateException e) {
+                            // Si no puede moverse, simplemente no hace nada este ciclo
+                        }
+                    }
+                }
+            }
+        }
         // No hay pedidos para procesar
         return false;
     }
@@ -359,6 +387,14 @@ public class RobotLogistico implements Ubicable {
         if (posicionActual.equals(destino)) {
             return null;
         }
+
+        // Si estamos adyacentes al destino (robopuerto), permitir entrar directamente
+        if (redLogistica != null) {
+            boolean destinoEsRobopuerto = redLogistica.getRobopuertos().stream().anyMatch(rp -> rp.getPosicion().equals(destino));
+            if (destinoEsRobopuerto && esAdyacente(posicionActual, destino)) {
+                return destino;
+            }
+        }
         
         // Calcular dirección hacia el destino
         int dx = Integer.compare(destino.getX(), posicionActual.getX());
@@ -406,9 +442,10 @@ public class RobotLogistico implements Ubicable {
      * Verifica si un movimiento es válido (no hay colisiones y está dentro del alcance).
      * 
      * @param nuevaPosicion Nueva posición a verificar
+     * @param destinoFinal Destino final para validar la entrada a un robopuerto
      * @return true si el movimiento es válido, false en caso contrario
      */
-    private boolean esMovimientoValido(Punto nuevaPosicion) {
+    private boolean esMovimientoValido(Punto nuevaPosicion, Punto destinoFinal) {
         System.out.println("Robot " + id + ": Verificando movimiento a posición " + nuevaPosicion);
         
         // Verificar que no se solape con otros robots
@@ -417,9 +454,13 @@ public class RobotLogistico implements Ubicable {
             return false;
         }
         
-        // Verificar que no se solape con robopuertos (a menos que deba frenar a recargar)
-        if (hayRobopuertoEnPosicion(nuevaPosicion) && !necesitaRecargar()) {
-            System.out.println("Robot " + id + ": Movimiento inválido - colisión con robopuerto (no necesita recargar)");
+        // Solo permitir entrar a un robopuerto si es el destino final
+        boolean esRobopuerto = false;
+        if (redLogistica != null) {
+            esRobopuerto = redLogistica.getRobopuertos().stream().anyMatch(rp -> rp.getPosicion().equals(nuevaPosicion));
+        }
+        if (esRobopuerto && (destinoFinal == null || !nuevaPosicion.equals(destinoFinal))) {
+            System.out.println("Robot " + id + ": Movimiento inválido - no puede atravesar robopuerto que no es destino final");
             return false;
         }
         
@@ -944,6 +985,11 @@ public class RobotLogistico implements Ubicable {
                 .orElse(movimientosValidos.get(0));
         
         return mejorMovimiento;
+    }
+
+    // Sobrecarga para mantener compatibilidad con otras llamadas
+    private boolean esMovimientoValido(Punto nuevaPosicion) {
+        return esMovimientoValido(nuevaPosicion, null);
     }
 
 }
