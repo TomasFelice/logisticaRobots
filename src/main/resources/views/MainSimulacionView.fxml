@@ -58,46 +58,47 @@
     </top>
     
     <center>
-        <ScrollPane pannable="true" fitToWidth="true" fitToHeight="true">
-            <Canvas fx:id="canvasGrilla" width="800" height="600"/>
-        </ScrollPane>
+        <SplitPane dividerPositions="0.7">
+            <items>
+                <ScrollPane pannable="true" fitToWidth="true" fitToHeight="true">
+                    <Canvas fx:id="canvasGrilla" width="800" height="600"/>
+                </ScrollPane>
+                <VBox spacing="5" prefWidth="300">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10"/>
+                    </padding>
+                    
+                    <Label text="Detalles de la Entidad Seleccionada">
+                        <font>
+                            <Font name="System Bold" size="14"/>
+                        </font>
+                    </Label>
+                    
+                    <TextArea fx:id="textAreaDetallesEntidad" 
+                              editable="false" 
+                              wrapText="true"
+                              VBox.vgrow="ALWAYS"/>
+                    
+                    <Label text="Leyenda:">
+                        <font>
+                            <Font name="System Bold" size="12"/>
+                        </font>
+                    </Label>
+                    
+                    <HBox spacing="5" alignment="CENTER_LEFT">
+                        <Rectangle width="12" height="12" fill="DARKBLUE"/>
+                        <Label text="Robopuerto"/>
+                        <Rectangle width="12" height="12" fill="BROWN"/>
+                        <Label text="Cofre (Accesible)"/>
+                        <Rectangle width="12" height="12" fill="GRAY"/>
+                        <Label text="Cofre (Inaccesible)"/>
+                        <Rectangle width="12" height="12" fill="GREEN"/>
+                        <Label text="Robot"/>
+                    </HBox>
+                </VBox>
+            </items>
+        </SplitPane>
     </center>
-    
-    <right>
-        <VBox spacing="5" prefWidth="300">
-            <padding>
-                <Insets top="10" right="10" bottom="10" left="10"/>
-            </padding>
-            
-            <Label text="Detalles de la Entidad Seleccionada">
-                <font>
-                    <Font name="System Bold" size="14"/>
-                </font>
-            </Label>
-            
-            <TextArea fx:id="textAreaDetallesEntidad" 
-                      editable="false" 
-                      wrapText="true"
-                      VBox.vgrow="ALWAYS"/>
-            
-            <Label text="Leyenda:">
-                <font>
-                    <Font name="System Bold" size="12"/>
-                </font>
-            </Label>
-            
-            <HBox spacing="5" alignment="CENTER_LEFT">
-                <Rectangle width="12" height="12" fill="DARKBLUE"/>
-                <Label text="Robopuerto"/>
-                <Rectangle width="12" height="12" fill="BROWN"/>
-                <Label text="Cofre (Accesible)"/>
-                <Rectangle width="12" height="12" fill="GRAY"/>
-                <Label text="Cofre (Inaccesible)"/>
-                <Rectangle width="12" height="12" fill="GREEN"/>
-                <Label text="Robot"/>
-            </HBox>
-        </VBox>
-    </right>
     
     <bottom>
         <HBox alignment="CENTER_RIGHT" spacing="10">
