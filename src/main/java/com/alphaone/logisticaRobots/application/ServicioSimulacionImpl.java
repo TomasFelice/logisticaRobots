@@ -169,9 +169,24 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             mensajeEstado = "Simulación finalizada: estado estable alcanzado";
             LoggerMovimientosRobots.getInstancia().guardar();
         } else {
-            estadoGeneral = "CORRIENDO";
-            mensajeEstado = "Ciclo " + cicloActual + " completado";
+            // Verificar si hay cofres inaccesibles que impiden completar pedidos
+            if (redLogistica.hayCofresInaccesiblesQueImpidenCompletarPedidos()) {
+                pausarSimulacion();
+                estadoGeneral = "FINALIZADA_COFRES_INACCESIBLES";
+                mensajeEstado = "Simulación finalizada: cofres inaccesibles detectados";
+                
+                // Agregar información de cofres inaccesibles al log
+                LoggerMovimientosRobots.getInstancia().agregarInformacionCofresInaccesibles(
+                    redLogistica.getInformacionCofresInaccesibles()
+                );
+                LoggerMovimientosRobots.getInstancia().guardar();
+            } else {
+                estadoGeneral = "CORRIENDO";
+                mensajeEstado = "Ciclo " + cicloActual + " completado";
+            }
         }
+
+        notificarObservadores();
     }
 
     @Override

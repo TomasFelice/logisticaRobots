@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class LoggerMovimientosRobots {
@@ -13,15 +15,24 @@ public class LoggerMovimientosRobots {
     private final String nombreArchivo;
     private final File archivo;
     private final Set<RobotLogistico> robotsRegistrados = new HashSet<>();
+    private String informacionCofresInaccesibles = "";
     
     private LoggerMovimientosRobots(String nombreArchivo) {
-        this.nombreArchivo = nombreArchivo.replace(".json", "_movimientos.txt");
+        // Obtener fecha y hora actual
+        LocalDateTime ahora = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd_MM_yyyy_HH_mm_ss");
+        String fechaHora = ahora.format(formatter);
+        
+        // Crear nombre único con fecha y hora
+        String nombreBase = nombreArchivo.replace(".json", "");
+        this.nombreArchivo = nombreBase + "_movimientos_" + fechaHora + ".txt";
+        
         // Crear el archivo en la carpeta logging
         String loggingPath = "src/main/java/com/alphaone/logisticaRobots/infrastructure/logging/";
         this.archivo = new File(loggingPath + this.nombreArchivo);
         // Crear el directorio si no existe
         archivo.getParentFile().mkdirs();
-        if (archivo.exists()) archivo.delete();
+        // No eliminar archivo existente, permitir múltiples ejecuciones
     }
     
     public static LoggerMovimientosRobots getInstancia(String nombreArchivo) {
@@ -43,12 +54,22 @@ public class LoggerMovimientosRobots {
         robotsRegistrados.add(robot);
     }
     
+    public synchronized void agregarInformacionCofresInaccesibles(String informacion) {
+        this.informacionCofresInaccesibles = informacion;
+    }
+    
     public synchronized void guardar() {
         try (PrintWriter pw = new PrintWriter(new FileWriter(archivo))) {
+            // Obtener fecha y hora para el encabezado
+            LocalDateTime ahora = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            String fechaHora = ahora.format(formatter);
+            
             // Encabezado del archivo
             pw.println("=".repeat(80));
             pw.println("                    REGISTRO DE MOVIMIENTOS DE ROBOTS");
             pw.println("=".repeat(80));
+            pw.println("Fecha y hora de simulación: " + fechaHora);
             pw.println();
             
             // Logs por robot
@@ -66,6 +87,16 @@ public class LoggerMovimientosRobots {
             pw.println("                           FIN DE PEDIDOS");
             pw.println("=".repeat(80));
             pw.println();
+            
+            // Información de cofres inaccesibles si existe
+            if (!informacionCofresInaccesibles.isEmpty()) {
+                pw.println("=".repeat(80));
+                pw.println("                    COFRES INACCESIBLES");
+                pw.println("=".repeat(80));
+                pw.println();
+                pw.println(informacionCofresInaccesibles);
+                pw.println();
+            }
             
             // Resumen de estados de robots
             pw.println("RESUMEN FINAL DE ESTADOS DE ROBOTS:");

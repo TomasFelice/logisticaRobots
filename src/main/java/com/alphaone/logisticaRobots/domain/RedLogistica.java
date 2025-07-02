@@ -186,8 +186,113 @@ public class RedLogistica { // es el universo donde se componen las cosas
                 (robot.getEstado() == EstadoRobot.PASIVO || robot.getEstado() == EstadoRobot.CARGANDO || robot.getEstado() == EstadoRobot.ACTIVO)
         );
 
-        // El sistema está estable solo si no hay pedidos pendientes y todos los robots están en robopuerto y en estado estable
-        return !pedidosPendientes && todosRobotsEstables;
+        // Verificar si hay cofres inaccesibles que impiden completar pedidos
+        boolean hayCofresInaccesibles = hayCofresInaccesiblesQueImpidenCompletarPedidos();
+
+        // El sistema está estable solo si no hay pedidos pendientes, todos los robots están en robopuerto y en estado estable,
+        // Y no hay cofres inaccesibles que impidan completar pedidos
+        return !pedidosPendientes && todosRobotsEstables && !hayCofresInaccesibles;
+    }
+
+    /**
+     * Verifica si hay cofres inaccesibles que impiden completar pedidos
+     * @return true si hay cofres inaccesibles que afectan pedidos pendientes
+     */
+    public boolean hayCofresInaccesiblesQueImpidenCompletarPedidos() {
+        // Obtener todos los cofres inaccesibles
+        List<CofreLogistico> cofresInaccesibles = getCofresInaccesibles();
+        
+        if (cofresInaccesibles.isEmpty()) {
+            return false;
+        }
+        
+        // Verificar si algún pedido pendiente involucra cofres inaccesibles
+        for (Pedido pedido : pedidos) {
+            if (pedido.getEstado() == Pedido.EstadoPedido.NUEVO || pedido.getEstado() == Pedido.EstadoPedido.EN_PROCESO) {
+                CofreLogistico origen = pedido.getCofreOrigen();
+                CofreLogistico destino = pedido.getCofreDestino();
+                
+                // Si el origen o destino es inaccesible, el pedido no se puede completar
+                if (cofresInaccesibles.contains(origen) || cofresInaccesibles.contains(destino)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Obtiene la lista de cofres inaccesibles
+     * @return Lista de cofres que no pueden ser alcanzados por ningún robopuerto
+     */
+    public List<CofreLogistico> getCofresInaccesibles() {
+        return cofres.stream()
+                .filter(cofre -> !esCofreAccesible(cofre))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtiene información detallada sobre cofres inaccesibles para el logging
+     * @return String con información detallada de cofres inaccesibles
+     */
+    public String getInformacionCofresInaccesibles() {
+        List<CofreLogistico> cofresInaccesibles = getCofresInaccesibles();
+        
+        if (cofresInaccesibles.isEmpty()) {
+            return "No hay cofres inaccesibles.";
+        }
+        
+        StringBuilder info = new StringBuilder();
+        info.append("COFRES INACCESIBLES DETECTADOS:\n");
+        info.append("-".repeat(40)).append("\n");
+        
+        for (CofreLogistico cofre : cofresInaccesibles) {
+            info.append("Cofre ID: ").append(cofre.getId()).append("\n");
+            info.append("  Posición: ").append(cofre.getPosicion()).append("\n");
+            info.append("  Tipo: ").append(cofre.getTipoComportamientoDefecto()).append("\n");
+            
+            // Verificar si está fuera de la grilla
+            if (!grillaEspacial.dentroDeGrilla(cofre.getPosicion())) {
+                info.append("  Razón: Fuera de los límites de la grilla espacial\n");
+            } else {
+                info.append("  Razón: No está en cobertura de ningún robopuerto\n");
+            }
+            info.append("\n");
+        }
+        
+        // Verificar pedidos afectados
+        info.append("PEDIDOS AFECTADOS POR COFRES INACCESIBLES:\n");
+        info.append("-".repeat(45)).append("\n");
+        
+        boolean hayPedidosAfectados = false;
+        for (Pedido pedido : pedidos) {
+            if (pedido.getEstado() == Pedido.EstadoPedido.NUEVO || pedido.getEstado() == Pedido.EstadoPedido.EN_PROCESO) {
+                CofreLogistico origen = pedido.getCofreOrigen();
+                CofreLogistico destino = pedido.getCofreDestino();
+                
+                if (cofresInaccesibles.contains(origen) || cofresInaccesibles.contains(destino)) {
+                    hayPedidosAfectados = true;
+                    info.append("Pedido: ").append(pedido.getItem().getNombre()).append(" x").append(pedido.getCantidad()).append("\n");
+                    info.append("  Origen: ").append(origen.getId()).append(" (").append(origen.getPosicion()).append(")");
+                    if (cofresInaccesibles.contains(origen)) {
+                        info.append(" [INACCESIBLE]");
+                    }
+                    info.append("\n");
+                    info.append("  Destino: ").append(destino.getId()).append(" (").append(destino.getPosicion()).append(")");
+                    if (cofresInaccesibles.contains(destino)) {
+                        info.append(" [INACCESIBLE]");
+                    }
+                    info.append("\n\n");
+                }
+            }
+        }
+        
+        if (!hayPedidosAfectados) {
+            info.append("No hay pedidos afectados por cofres inaccesibles.\n");
+        }
+        
+        return info.toString();
     }
 
     /**
