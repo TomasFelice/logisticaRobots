@@ -499,42 +499,43 @@ private void dibujarRobot(RobotDTO robot) {
         gc.setStroke(Color.LIGHTGREEN);
         gc.setLineWidth(2.0);
 
-        // Dibujar líneas de la ruta paso a paso
-        PuntoDTO pAnterior = robot.posicion();
-        for (int i = 0; i < robot.rutaActual().size(); i++) {
+        // Si la ruta comienza en un punto diferente a la posición actual, partir desde el primer punto de la ruta
+        PuntoDTO pAnterior = robot.rutaActual().get(0);
+        int inicio = 1;
+        if (!robot.rutaActual().get(0).equals(robot.posicion())) {
+            // Dibujar línea desde el primer punto de la ruta hasta el segundo
+            // (no desde la posición actual del robot)
+            // Si se quiere, se puede dibujar una línea punteada desde la posición actual al primer punto de la ruta
+            // pero por ahora solo mostramos la ruta planificada
+            inicio = 1;
+        } else {
+            // Si la ruta comienza en la posición actual, partir desde ahí
+            pAnterior = robot.posicion();
+            inicio = 1;
+        }
+        for (int i = inicio; i < robot.rutaActual().size(); i++) {
             PuntoDTO pSiguiente = robot.rutaActual().get(i);
-            
-            // Dibujar línea entre puntos consecutivos
             gc.strokeLine(
                 pAnterior.x() * ESCALA_DIBUJO, pAnterior.y() * ESCALA_DIBUJO,
                 pSiguiente.x() * ESCALA_DIBUJO, pSiguiente.y() * ESCALA_DIBUJO
             );
-            
             // Dibujar punto de paso (círculo más pequeño para puntos intermedios)
             gc.setFill(Color.LIGHTGREEN);
             double radioPunto = (i == robot.rutaActual().size() - 1) ? 3 : 2; // Punto final más grande
             gc.fillOval(pSiguiente.x() * ESCALA_DIBUJO - radioPunto, pSiguiente.y() * ESCALA_DIBUJO - radioPunto, 
                        radioPunto * 2, radioPunto * 2);
-            
             pAnterior = pSiguiente;
         }
-        
         // Dibujar flecha en el punto final para indicar dirección
         if (robot.rutaActual().size() > 1) {
             PuntoDTO penultimo = robot.rutaActual().get(robot.rutaActual().size() - 2);
             PuntoDTO ultimo = robot.rutaActual().get(robot.rutaActual().size() - 1);
-            
-            // Calcular dirección de la flecha
             double dx = ultimo.x() - penultimo.x();
             double dy = ultimo.y() - penultimo.y();
-            
             if (dx != 0 || dy != 0) {
-                // Normalizar y escalar
                 double length = Math.sqrt(dx * dx + dy * dy);
                 dx = (dx / length) * 8;
                 dy = (dy / length) * 8;
-                
-                // Dibujar flecha
                 gc.setFill(Color.DARKGREEN);
                 gc.fillOval(ultimo.x() * ESCALA_DIBUJO - 4, ultimo.y() * ESCALA_DIBUJO - 4, 8, 8);
             }

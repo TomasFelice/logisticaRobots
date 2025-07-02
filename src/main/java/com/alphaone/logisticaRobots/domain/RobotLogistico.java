@@ -761,6 +761,26 @@ public class RobotLogistico implements Ubicable {
     public List<Punto> getRutaActual() {
         List<Punto> ruta = new ArrayList<>();
 
+        // Si no hay pedido actual pero hay pedidos pendientes, mostrar la ruta desde el último cofre de entrega al origen del siguiente pedido
+        if (pedidoActual == null && !pedidosPendientes.isEmpty() && !historialPedidos.isEmpty() && redLogistica != null) {
+            Pedido ultimoPedido = historialPedidos.get(historialPedidos.size() - 1);
+            CofreLogistico cofreEntrega = ultimoPedido.getCofreDestino();
+            Pedido siguientePedido = pedidosPendientes.peek();
+            CofreLogistico cofreSiguienteOrigen = siguientePedido.getCofreOrigen();
+            if (cofreEntrega != null && cofreSiguienteOrigen != null) {
+                ruta = calcularRutaReal(cofreEntrega.getPosicion(), cofreSiguienteOrigen.getPosicion());
+                // Si el origen es un cofre y la ruta termina en una celda adyacente, agregar el punto del cofre como último punto visual
+                boolean destinoEsCofre = redLogistica.getCofres().stream().anyMatch(c -> c.getPosicion().equals(cofreSiguienteOrigen.getPosicion()));
+                if (destinoEsCofre && !ruta.isEmpty()) {
+                    Punto ultimo = ruta.get(ruta.size() - 1);
+                    if (esAdyacente(ultimo, cofreSiguienteOrigen.getPosicion()) && !ultimo.equals(cofreSiguienteOrigen.getPosicion())) {
+                        ruta.add(cofreSiguienteOrigen.getPosicion());
+                    }
+                }
+            }
+            return ruta;
+        }
+
         // Si no hay pedido actual, no hay ruta
         if (pedidoActual == null) {
             return ruta;
@@ -787,8 +807,55 @@ public class RobotLogistico implements Ubicable {
             return ruta;
         }
 
+        // Si el robot está en estado PASIVO o CARGANDO, mostrar solo la ruta al robopuerto más cercano
+        if (estado == EstadoRobot.PASIVO || estado == EstadoRobot.CARGANDO) {
+            if (redLogistica != null) {
+                Robopuerto robopuertoCercano = redLogistica.getRobopuertoMasCercano(posicion);
+                if (robopuertoCercano != null) {
+                    ruta = calcularRutaReal(posicion, robopuertoCercano.getPosicion());
+                }
+            }
+            return ruta;
+        }
+
+        // Calcular el consumo de batería necesario para llegar al destino
+        double consumoEstimado = posicion.distanciaHacia(puntoDestino) * ParametrosGenerales.FACTOR_CONSUMO;
+        if (!tieneSuficienteBateria((int)Math.ceil(consumoEstimado))) {
+            // No hay suficiente batería, planificar desvío a robopuerto más cercano
+            if (redLogistica != null) {
+                Robopuerto robopuertoCercano = redLogistica.getRobopuertoMasCercano(posicion);
+                if (robopuertoCercano != null) {
+                    // Ruta hasta el robopuerto
+                    List<Punto> rutaARobopuerto = calcularRutaReal(posicion, robopuertoCercano.getPosicion());
+                    // Ruta desde el robopuerto al destino
+                    List<Punto> rutaDesdeRobopuerto = calcularRutaReal(robopuertoCercano.getPosicion(), puntoDestino);
+                    // Unir ambas rutas (evitar duplicar el punto de robopuerto)
+                    ruta.addAll(rutaARobopuerto);
+                    if (!rutaDesdeRobopuerto.isEmpty()) {
+                        if (!rutaARobopuerto.isEmpty() && rutaARobopuerto.get(rutaARobopuerto.size()-1).equals(rutaDesdeRobopuerto.get(0))) {
+                            rutaDesdeRobopuerto.remove(0);
+                        }
+                        ruta.addAll(rutaDesdeRobopuerto);
+                    }
+                    return ruta;
+                }
+            }
+        }
+
         // Calcular la ruta real que seguirá el robot usando su algoritmo de movimiento
         ruta = calcularRutaReal(posicion, puntoDestino);
+
+        // Si el destino es un cofre y la ruta termina en una celda adyacente, agregar el punto del cofre como último punto visual
+        boolean destinoEsCofre = false;
+        if (puntoDestino != null && redLogistica != null) {
+            destinoEsCofre = redLogistica.getCofres().stream().anyMatch(c -> c.getPosicion().equals(puntoDestino));
+        }
+        if (destinoEsCofre && !ruta.isEmpty()) {
+            Punto ultimo = ruta.get(ruta.size() - 1);
+            if (esAdyacente(ultimo, puntoDestino) && !ultimo.equals(puntoDestino)) {
+                ruta.add(puntoDestino);
+            }
+        }
 
         return ruta;
     }
@@ -813,8 +880,8 @@ public class RobotLogistico implements Ubicable {
         int pasos = 0;
         
         while (!posicionSimulada.equals(destino) && pasos < maxPasos) {
-            // Usar el mismo algoritmo que usa el robot para calcular el siguiente paso
-            Punto siguientePaso = calcularSiguientePasoSimulado(posicionSimulada, destino);
+            // Usar el mismo algoritmo que usa el robot para calcular el siguiente paso, pero validando obstáculos
+            Punto siguientePaso = calcularSiguientePasoSimuladoConObstaculos(posicionSimulada, destino);
             
             if (siguientePaso == null) {
                 // No se puede avanzar más, terminar la ruta
@@ -832,13 +899,14 @@ public class RobotLogistico implements Ubicable {
 
     /**
      * Versión simulada del cálculo de siguiente paso para generar la ruta.
-     * No verifica colisiones ni consume batería, solo calcula el movimiento.
+     * Verifica obstáculos igual que el movimiento real (cofres, robots, robopuertos, etc.).
+     * No consume batería ni cambia el estado real del robot.
      * 
      * @param posicionActual Posición actual
      * @param destino Posición de destino
      * @return Siguiente posición en la ruta
      */
-    private Punto calcularSiguientePasoSimulado(Punto posicionActual, Punto destino) {
+    private Punto calcularSiguientePasoSimuladoConObstaculos(Punto posicionActual, Punto destino) {
         // Si ya estamos en el destino, no hay movimiento
         if (posicionActual.equals(destino)) {
             return null;
@@ -861,15 +929,19 @@ public class RobotLogistico implements Ubicable {
             movimientosPosibles.add(new Punto(posicionActual.getX(), posicionActual.getY() + dy));
         }
         
-        // Si no hay movimientos posibles, retornar null
-        if (movimientosPosibles.isEmpty()) {
+        // Filtrar movimientos válidos (sin colisiones ni obstáculos)
+        List<Punto> movimientosValidos = movimientosPosibles.stream()
+                .filter(this::esMovimientoValido)
+                .collect(Collectors.toList());
+        
+        if (movimientosValidos.isEmpty()) {
             return null;
         }
         
         // Elegir el movimiento que más se acerque al destino
-        Punto mejorMovimiento = movimientosPosibles.stream()
+        Punto mejorMovimiento = movimientosValidos.stream()
                 .min(Comparator.comparingDouble(p -> p.distanciaHacia(destino)))
-                .orElse(movimientosPosibles.get(0));
+                .orElse(movimientosValidos.get(0));
         
         return mejorMovimiento;
     }
