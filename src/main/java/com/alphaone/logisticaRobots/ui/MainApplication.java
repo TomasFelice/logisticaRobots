@@ -36,6 +36,21 @@ public class MainApplication extends Application {
             // Crear e inyectar el servicio
             ServicioSimulacion servicioSimulacion = new ServicioSimulacionImpl();
             controller.setServicioSimulacion(servicioSimulacion);
+
+            // Cargar configuración por defecto al iniciar
+            try {
+                // Obtener el archivo de configuración desde resources
+                java.net.URL configUrl = getClass().getResource("/config/redConectadaCompletaCumplible.json");
+                if (configUrl != null) {
+                    java.io.File configFile = new java.io.File(configUrl.toURI());
+                    servicioSimulacion.cargarConfiguracion(configFile);
+                } else {
+                    System.err.println("No se encontró el archivo de configuración por defecto en resources/config/redConectadaCompletaCumplible.json");
+                }
+            } catch (Exception e) {
+                System.err.println("Error al cargar la configuración por defecto: " + e.getMessage());
+                e.printStackTrace();
+            }
             
             // Configurar y mostrar la escena
             Scene scene = new Scene(root, 1200, 800);
