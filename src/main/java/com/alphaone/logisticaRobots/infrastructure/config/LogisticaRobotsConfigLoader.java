@@ -155,10 +155,15 @@ public class LogisticaRobotsConfigLoader {
 
                 // Posición inicial (se asume en el robopuerto inicial)
                 PuntoDTO posicion = new PuntoDTO(0, 0);
-                if (robotNode.has("robopuertoInicial") && !robopuertos.isEmpty()) {
-                    int rpIndex = robotNode.get("robopuertoInicial").asInt() - 1;
-                    if (rpIndex >= 0 && rpIndex < robopuertos.size()) {
-                        posicion = robopuertos.get(rpIndex).posicion();
+                String robopuertoBaseId = null;
+                if (robotNode.has("robopuertoInicialId") && !robopuertos.isEmpty()) {
+                    robopuertoBaseId = robotNode.get("robopuertoInicialId").asText();
+                    // Buscar el robopuerto por ID
+                    for (RobopuertoDTO rp : robopuertos) {
+                        if (rp.id().equals(robopuertoBaseId)) {
+                            posicion = rp.posicion();
+                            break;
+                        }
                     }
                 }
 
@@ -172,7 +177,8 @@ public class LogisticaRobotsConfigLoader {
                         capacidadCarga, 
                         new HashMap<>(), 
                         estado, 
-                        null
+                        null,
+                        robopuertoBaseId
                 );
                 robots.add(robotDTO);
             }

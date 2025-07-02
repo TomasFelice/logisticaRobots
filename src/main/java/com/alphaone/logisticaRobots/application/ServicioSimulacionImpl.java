@@ -252,12 +252,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         // Cargar robots
         if (configuracion.robots() != null) {
             for (RobotDTO robotDTO : configuracion.robots()) {
-                // Buscar el robopuerto base del robot
+                // Buscar el robopuerto base del robot por ID
                 Robopuerto robopuertoBase = null;
-                for (Robopuerto rp : robopuertos) {
-                    if (rp.getPosicion().equals(new Punto(robotDTO.posicion().x(), robotDTO.posicion().y()))) {
-                        robopuertoBase = rp;
-                        break;
+                if (robotDTO.robopuertoBaseId() != null) {
+                    for (Robopuerto rp : robopuertos) {
+                        if (rp.getId().equals(robotDTO.robopuertoBaseId())) {
+                            robopuertoBase = rp;
+                            break;
+                        }
                     }
                 }
                 if (robopuertoBase == null && !robopuertos.isEmpty()) {
@@ -524,7 +526,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     robot.getCapacidadCarga(),
                     itemsEnCarga,
                     robot.getEstado().toString(),
-                    rutaDTO
+                    rutaDTO,
+                    robot.getRobopuertoBase() != null ? robot.getRobopuertoBase().getId() : null
             );
 
             resultado.add(robotDTO);
