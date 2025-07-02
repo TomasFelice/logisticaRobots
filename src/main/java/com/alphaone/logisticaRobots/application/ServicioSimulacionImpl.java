@@ -512,13 +512,16 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                         .toList();
             }
 
+            // Calcular la carga actual total
+            int cargaActualTotal = itemsEnCarga.values().stream().mapToInt(Integer::intValue).sum();
+
             RobotDTO robotDTO = new RobotDTO(
                     String.valueOf(robot.getId()),
                     posicionDTO,
                     robot.getBateriaActual(),
                     robot.getBateriaMaxima(),
-                    robot.getBateriaActual(), // Supongo que hay un metodo así
-                    robot.getBateriaMaxima(),
+                    cargaActualTotal,
+                    robot.getCapacidadCarga(),
                     itemsEnCarga,
                     robot.getEstado().toString(),
                     rutaDTO

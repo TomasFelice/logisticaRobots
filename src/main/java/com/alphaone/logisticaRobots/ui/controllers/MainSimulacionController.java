@@ -497,19 +497,47 @@ private void dibujarRobot(RobotDTO robot) {
     // Dibujar ruta actual si existe
     if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
         gc.setStroke(Color.LIGHTGREEN);
-        gc.setLineWidth(1.5);
+        gc.setLineWidth(2.0);
 
-        // Dibujar líneas de la ruta
+        // Dibujar líneas de la ruta paso a paso
         PuntoDTO pAnterior = robot.posicion();
-        for (PuntoDTO pSiguiente : robot.rutaActual()) {
+        for (int i = 0; i < robot.rutaActual().size(); i++) {
+            PuntoDTO pSiguiente = robot.rutaActual().get(i);
+            
+            // Dibujar línea entre puntos consecutivos
             gc.strokeLine(
                 pAnterior.x() * ESCALA_DIBUJO, pAnterior.y() * ESCALA_DIBUJO,
                 pSiguiente.x() * ESCALA_DIBUJO, pSiguiente.y() * ESCALA_DIBUJO
             );
-            // Pequeño círculo en cada punto de la ruta
+            
+            // Dibujar punto de paso (círculo más pequeño para puntos intermedios)
             gc.setFill(Color.LIGHTGREEN);
-            gc.fillOval(pSiguiente.x() * ESCALA_DIBUJO - 2, pSiguiente.y() * ESCALA_DIBUJO - 2, 4, 4);
+            double radioPunto = (i == robot.rutaActual().size() - 1) ? 3 : 2; // Punto final más grande
+            gc.fillOval(pSiguiente.x() * ESCALA_DIBUJO - radioPunto, pSiguiente.y() * ESCALA_DIBUJO - radioPunto, 
+                       radioPunto * 2, radioPunto * 2);
+            
             pAnterior = pSiguiente;
+        }
+        
+        // Dibujar flecha en el punto final para indicar dirección
+        if (robot.rutaActual().size() > 1) {
+            PuntoDTO penultimo = robot.rutaActual().get(robot.rutaActual().size() - 2);
+            PuntoDTO ultimo = robot.rutaActual().get(robot.rutaActual().size() - 1);
+            
+            // Calcular dirección de la flecha
+            double dx = ultimo.x() - penultimo.x();
+            double dy = ultimo.y() - penultimo.y();
+            
+            if (dx != 0 || dy != 0) {
+                // Normalizar y escalar
+                double length = Math.sqrt(dx * dx + dy * dy);
+                dx = (dx / length) * 8;
+                dy = (dy / length) * 8;
+                
+                // Dibujar flecha
+                gc.setFill(Color.DARKGREEN);
+                gc.fillOval(ultimo.x() * ESCALA_DIBUJO - 4, ultimo.y() * ESCALA_DIBUJO - 4, 8, 8);
+            }
         }
     }
 
@@ -736,7 +764,20 @@ private void dibujarRobot(RobotDTO robot) {
                 robot.itemsEnCarga().forEach((item, cant) -> sb.append("  - ").append(item).append(": ").append(cant).append("\n"));
                 sb.append("com.alphaone.logisticaRobots.domain.Estado: ").append(robot.estadoActual()).append("\n");
                 if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
-                    sb.append("com.alphaone.logisticaRobots.domain.pathfinding.Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
+                    sb.append("Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
+                    
+                    // Mostrar información adicional de la ruta
+                    PuntoDTO destino = robot.rutaActual().get(robot.rutaActual().size() - 1);
+                    sb.append("Destino: (").append(destino.x()).append(", ").append(destino.y()).append(")\n");
+                    
+                    // Calcular distancia total de la ruta
+                    double distanciaTotal = 0;
+                    PuntoDTO anterior = robot.posicion();
+                    for (PuntoDTO punto : robot.rutaActual()) {
+                        distanciaTotal += Math.sqrt(Math.pow(punto.x() - anterior.x(), 2) + Math.pow(punto.y() - anterior.y(), 2));
+                        anterior = punto;
+                    }
+                    sb.append(String.format("Distancia total: %.1f unidades\n", distanciaTotal));
                 }
                 break;
             case "COFRE":

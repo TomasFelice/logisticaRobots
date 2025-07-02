@@ -59,6 +59,7 @@ public class RobotLogistico implements Ubicable {
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
+    public int getCapacidadCarga() {return capacidadPedidosTraslado;}
 
     @Override
     public Punto getPosicion() {
@@ -752,8 +753,8 @@ public class RobotLogistico implements Ubicable {
 
     /**
      * Obtiene la ruta actual que está siguiendo el robot.
-     * Calcula una ruta desde la posición actual del robot hasta su destino,
-     * basándose en el estado actual del pedido que está procesando.
+     * Calcula la ruta real que seguirá el robot basándose en su algoritmo de movimiento ortogonal,
+     * desde la posición actual hasta su destino.
      * 
      * @return Lista de puntos que representan la ruta actual del robot
      */
@@ -786,24 +787,91 @@ public class RobotLogistico implements Ubicable {
             return ruta;
         }
 
-        // Calcular la ruta como una línea recta entre la posición actual y el destino
-        // Dividimos la distancia en segmentos para crear una ruta más detallada
-        double distancia = posicion.distanciaHacia(puntoDestino);
-        int numSegmentos = Math.max(10, (int)distancia / 5); // Al menos 10 segmentos, o uno cada 5 unidades
-
-        // Agregar la posición actual como primer punto de la ruta
-        ruta.add(new Punto(posicion.getX(), posicion.getY()));
-
-        // Calcular puntos intermedios
-        for (int i = 1; i <= numSegmentos; i++) {
-            double porcentaje = (double) i / numSegmentos;
-            int x = (int) (posicion.getX() + (puntoDestino.getX() - posicion.getX()) * porcentaje);
-            int y = (int) (posicion.getY() + (puntoDestino.getY() - posicion.getY()) * porcentaje);
-            ruta.add(new Punto(x, y));
-        }
+        // Calcular la ruta real que seguirá el robot usando su algoritmo de movimiento
+        ruta = calcularRutaReal(posicion, puntoDestino);
 
         return ruta;
     }
 
+    /**
+     * Calcula la ruta real que seguirá el robot desde su posición actual hasta el destino,
+     * usando el mismo algoritmo de movimiento que usa para moverse.
+     * 
+     * @param posicionActual Posición actual del robot
+     * @param destino Posición de destino
+     * @return Lista de puntos que representan la ruta real
+     */
+    private List<Punto> calcularRutaReal(Punto posicionActual, Punto destino) {
+        List<Punto> ruta = new ArrayList<>();
+        Punto posicionSimulada = new Punto(posicionActual.getX(), posicionActual.getY());
+        
+        // Agregar la posición actual como primer punto
+        ruta.add(new Punto(posicionSimulada.getX(), posicionSimulada.getY()));
+        
+        // Simular el movimiento paso a paso hasta llegar al destino
+        int maxPasos = 100; // Límite para evitar bucles infinitos
+        int pasos = 0;
+        
+        while (!posicionSimulada.equals(destino) && pasos < maxPasos) {
+            // Usar el mismo algoritmo que usa el robot para calcular el siguiente paso
+            Punto siguientePaso = calcularSiguientePasoSimulado(posicionSimulada, destino);
+            
+            if (siguientePaso == null) {
+                // No se puede avanzar más, terminar la ruta
+                break;
+            }
+            
+            // Agregar el siguiente paso a la ruta
+            ruta.add(new Punto(siguientePaso.getX(), siguientePaso.getY()));
+            posicionSimulada = siguientePaso;
+            pasos++;
+        }
+        
+        return ruta;
+    }
+
+    /**
+     * Versión simulada del cálculo de siguiente paso para generar la ruta.
+     * No verifica colisiones ni consume batería, solo calcula el movimiento.
+     * 
+     * @param posicionActual Posición actual
+     * @param destino Posición de destino
+     * @return Siguiente posición en la ruta
+     */
+    private Punto calcularSiguientePasoSimulado(Punto posicionActual, Punto destino) {
+        // Si ya estamos en el destino, no hay movimiento
+        if (posicionActual.equals(destino)) {
+            return null;
+        }
+        
+        // Calcular dirección hacia el destino
+        int dx = Integer.compare(destino.getX(), posicionActual.getX());
+        int dy = Integer.compare(destino.getY(), posicionActual.getY());
+        
+        // Generar posibles movimientos ortogonales
+        List<Punto> movimientosPosibles = new ArrayList<>();
+        
+        // Movimiento horizontal
+        if (dx != 0) {
+            movimientosPosibles.add(new Punto(posicionActual.getX() + dx, posicionActual.getY()));
+        }
+        
+        // Movimiento vertical
+        if (dy != 0) {
+            movimientosPosibles.add(new Punto(posicionActual.getX(), posicionActual.getY() + dy));
+        }
+        
+        // Si no hay movimientos posibles, retornar null
+        if (movimientosPosibles.isEmpty()) {
+            return null;
+        }
+        
+        // Elegir el movimiento que más se acerque al destino
+        Punto mejorMovimiento = movimientosPosibles.stream()
+                .min(Comparator.comparingDouble(p -> p.distanciaHacia(destino)))
+                .orElse(movimientosPosibles.get(0));
+        
+        return mejorMovimiento;
+    }
 
 }
