@@ -794,14 +794,14 @@ public class RobotLogistico implements Ubicable {
         // Determinar el destino actual basado en el estado del pedido
         Punto puntoDestino;
 
-        // Si no hemos llegado al origen o no hemos cargado los items, el destino es el origen
-        if (!posicion.equals(origen.getPosicion()) || !cargaActual.containsKey(item)) {
+        // Si no hemos recogido los items (no estamos en el origen o no tenemos el item), el destino es el origen
+        if (!cargaActual.containsKey(item) || (!posicion.equals(origen.getPosicion()) && !cargaActual.containsKey(item))) {
             puntoDestino = origen.getPosicion();
-        } 
-        // Si ya cargamos los items pero no estamos en el destino, el destino es el destino
+        }
+        // Si ya recogimos los items y no estamos en el destino, el destino es el destino
         else if (cargaActual.containsKey(item) && !posicion.equals(destino.getPosicion())) {
             puntoDestino = destino.getPosicion();
-        } 
+        }
         // Si ya estamos en el destino, no hay ruta
         else {
             return ruta;
