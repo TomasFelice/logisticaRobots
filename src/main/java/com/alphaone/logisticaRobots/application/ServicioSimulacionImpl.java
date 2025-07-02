@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.alphaone.logisticaRobots.infrastructure.logging.LoggerMovimientosRobots;
 
 import java.io.File;
 import java.io.IOException;
@@ -158,9 +159,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     // Implementación real del ciclo
     private void ejecutarCicloSimulacion() {
-        // Aquí iría la llamada al metodo simularCiclo() de com.alphaone.logisticaRobots.domain.RedLogistica
-        redLogistica.simularCiclo();
-
+        redLogistica.simularCiclo(cicloActual);
         cicloActual++;
 
         // Verificar si se alcanzó un estado estable
@@ -168,6 +167,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             pausarSimulacion();
             estadoGeneral = "FINALIZADA_ESTABLE";
             mensajeEstado = "Simulación finalizada: estado estable alcanzado";
+            LoggerMovimientosRobots.getInstancia().guardar();
         } else {
             estadoGeneral = "CORRIENDO";
             mensajeEstado = "Ciclo " + cicloActual + " completado";
@@ -280,6 +280,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
         // Crear la red logística con todas las entidades cargadas
         this.redLogistica = new RedLogistica(robopuertos, grilla, cofres, robots, pedidos);
+
+        // Inicializar logger de movimientos
+        LoggerMovimientosRobots loggerMovimientos = LoggerMovimientosRobots.getInstancia(archivoConfig.getName());
+
+        // Registrar robots en el logger para el resumen final
+        for (RobotLogistico robot : robots) {
+            loggerMovimientos.registrarRobot(robot);
+        }
 
         // Establecer velocidad de simulación
         velocidadSimulacion = configuracion.velocidadSimulacion() > 0 ?

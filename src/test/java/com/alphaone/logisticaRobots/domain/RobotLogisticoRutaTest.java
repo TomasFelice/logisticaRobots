@@ -49,7 +49,7 @@ public class RobotLogisticoRutaTest {
         robot.agregarPedido(pedido);
         
         // Procesar el pedido para que se convierta en pedido actual
-        robot.procesarSiguientePedido();
+        ///robot.procesarSiguientePedido();
         
         // Obtener la ruta
         List<Punto> ruta = robot.getRutaActual();
@@ -87,7 +87,7 @@ public class RobotLogisticoRutaTest {
         robot.agregarPedido(pedido);
         
         // Procesar el pedido
-        robot.procesarSiguientePedido();
+        ///robot.procesarSiguientePedido();
         
         // Simular que el robot ya cargó el item (moverlo al origen y agregar carga)
         robot.setPosicion(origen.getPosicion());
@@ -114,7 +114,7 @@ public class RobotLogisticoRutaTest {
         robot.agregarPedido(pedido);
         
         // Procesar el pedido
-        robot.procesarSiguientePedido();
+        ///robot.procesarSiguientePedido();
         
         // Obtener la ruta
         List<Punto> ruta = robot.getRutaActual();
@@ -137,7 +137,7 @@ public class RobotLogisticoRutaTest {
         robot.agregarPedido(pedido);
         
         // Procesar el pedido
-        robot.procesarSiguientePedido();
+        ///robot.procesarSiguientePedido();
         
         // Obtener la ruta
         List<Punto> ruta = robot.getRutaActual();

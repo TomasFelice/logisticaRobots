@@ -104,7 +104,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
      * y asignarlos a los robots según su prioridad y capacidades.
      * Procesa los pedidos pendientes y mueve los robots según sea necesario.
      */
-    public void simularCiclo() {
+    public void simularCiclo(int cicloActual) {
         // Verificar que todos los robots tengan la red configurada
         verificarConfiguracionRobots();
         
@@ -120,8 +120,7 @@ public class RedLogistica { // es el universo donde se componen las cosas
         // Procesar robots según su estado actual
         for (RobotLogistico robot : robotsLogisticos) {
             if (robot.getEstado() == EstadoRobot.EN_MISION) {
-                // Procesar el pedido actual del robot
-                robot.procesarSiguientePedido();
+                robot.procesarSiguientePedido(cicloActual);
                 System.out.println("Robot " + robot + " procesando pedido");
                 // Si el robot NO tiene pedido actual ni pendientes, y está en un robopuerto, cambiar a PASIVO
                 boolean sinPedidos = robot.getPedidosPendientes().isEmpty() && robot.getHistorialPedidos().size() > 0 && robot.getEstado() == EstadoRobot.EN_MISION && robot.getRutaActual().isEmpty();
@@ -131,10 +130,8 @@ public class RedLogistica { // es el universo donde se componen las cosas
                     System.out.println("Robot " + robot + " llegó a robopuerto y pasa a PASIVO");
                 }
             } else if (robot.getEstado() == EstadoRobot.ACTIVO) {
-                // Si el robot está activo, intentar procesar un nuevo pedido
-                if (robot.procesarSiguientePedido()) {
-                    System.out.println("Robot " + robot + " iniciando nuevo pedido");
-                }
+                robot.procesarSiguientePedido(cicloActual);
+                System.out.println("Robot " + robot + " iniciando nuevo pedido");
             } else if (robot.getEstado() == EstadoRobot.PASIVO || robot.getEstado() == EstadoRobot.CARGANDO) {
                 // Si el robot está en un robopuerto, intentamos recargarlo
                 for (Robopuerto robopuerto : robopuertos) {

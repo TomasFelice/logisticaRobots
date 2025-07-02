@@ -2,10 +2,14 @@ package com.alphaone.logisticaRobots.domain;
 
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.shared.ParametrosGenerales;
-
+import com.alphaone.logisticaRobots.infrastructure.logging.LoggerMovimientosRobots;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class RobotLogistico implements Ubicable {
     private final int id;
@@ -142,10 +146,10 @@ public class RobotLogistico implements Ubicable {
      * 
      * @return true si se procesó un pedido, false si no había pedidos pendientes
      */
-    public boolean procesarSiguientePedido() {
+    public boolean procesarSiguientePedido(int cicloActual) {
         // Si ya hay un pedido en proceso, continuar con él
         if (pedidoActual != null) {
-            return continuarPedidoActual();
+            return continuarPedidoActual(cicloActual);
         }
 
         // Si no hay pedido actual pero hay pendientes, tomar el siguiente
@@ -198,73 +202,62 @@ public class RobotLogistico implements Ubicable {
      * 
      * @return true si el pedido sigue en proceso, false si se completó o falló
      */
-    private boolean continuarPedidoActual() {
+    private boolean continuarPedidoActual(int cicloActual) {
         if (pedidoActual == null) {
             return false;
         }
-
         // Verificar que la red logística esté configurada
         if (!tieneRedLogistica()) {
+            LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "error_red_logistica", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
             System.out.println("Robot " + id + ": ERROR - No hay red logística configurada. No se pueden verificar colisiones ni alcance.");
             pedidoActual.marcarFallido();
             finalizarPedido();
             return false;
         }
-
-        // Verificar si tenemos suficiente batería para continuar
         if (!tieneSuficienteBateria(10)) {
-            // Necesitamos recargar
+            LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "espera_recarga", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
             cambiarEstado(EstadoRobot.PASIVO);
             System.out.println("Robot " + id + " necesita recargar. Batería actual: " + bateriaActual);
             return true;
         }
-
-        // Obtener los cofres de origen y destino
         CofreLogistico origen = pedidoActual.getCofreOrigen();
         CofreLogistico destino = pedidoActual.getCofreDestino();
         Item item = pedidoActual.getItem();
         int cantidad = pedidoActual.getCantidad();
-
-        // Estado del pedido: 
-        // 1. Moverse a una celda adyacente al cofre de origen
-        // 2. Recoger los items
-        // 3. Moverse a una celda adyacente al cofre de destino
-        // 4. Entregar los items
-
         // 1. Moverse a una celda adyacente al cofre de origen
         if (!cargaActual.containsKey(item)) {
             if (!esAdyacente(posicion, origen.getPosicion())) {
-                // Si estamos muy cerca del origen, buscar una posición adyacente libre
                 if (posicion.distanciaHacia(origen.getPosicion()) <= 1.5) {
                     Punto posicionAdyacente = encontrarPosicionAdyacenteLibre(origen.getPosicion());
                     if (posicionAdyacente != null) {
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "mover_adjacente_origen", posicion.toString(), posicionAdyacente.toString(), posicion.distanciaHacia(posicionAdyacente), bateriaActual + "/" + bateriaMaxima);
                         setPosicion(posicionAdyacente);
                         System.out.println("Robot " + id + " llegó a una celda adyacente al cofre de origen " + origen.getId());
                         consumirBateria(2);
                     } else {
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "fallo_adjacente_origen", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                         System.out.println("Robot " + id + " no puede encontrar posición adyacente libre al origen.");
                         pedidoActual.marcarFallido();
                         finalizarPedido();
                         return false;
                     }
                 } else {
-                    // Calcular el siguiente paso hacia el origen
                     Punto siguientePaso = calcularSiguientePaso(posicion, origen.getPosicion());
-                    
-                    // Verificar que el siguiente paso es válido
                     if (siguientePaso != null && esMovimientoValido(siguientePaso)) {
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "mover_hacia_origen", posicion.toString(), siguientePaso.toString(), posicion.distanciaHacia(siguientePaso), bateriaActual + "/" + bateriaMaxima);
                         setPosicion(siguientePaso);
                         int consumoBateria = (int) Math.ceil(posicion.distanciaHacia(siguientePaso) * ParametrosGenerales.FACTOR_CONSUMO);
                         try {
                             consumirBateria(consumoBateria);
                             System.out.println("Robot " + id + " moviéndose hacia cofre origen. Posición: " + posicion + ", Batería: " + bateriaActual + "/" + bateriaMaxima);
                         } catch (IllegalStateException e) {
+                            LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "fallo_bateria_mov_origen", posicion.toString(), siguientePaso.toString(), posicion.distanciaHacia(siguientePaso), bateriaActual + "/" + bateriaMaxima);
                             pedidoActual.marcarFallido();
                             finalizarPedido();
                             return false;
                         }
                     } else {
-                        // No se puede mover, marcar como fallido
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "bloqueo_mov_origen", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                         System.out.println("Robot " + id + " no puede moverse hacia el origen. Posición bloqueada.");
                         pedidoActual.marcarFallido();
                         finalizarPedido();
@@ -273,26 +266,28 @@ public class RobotLogistico implements Ubicable {
                 }
                 return true;
             }
-            
-            // 2. Recoger los items si está adyacente
             if (esAdyacente(posicion, origen.getPosicion()) && !cargaActual.containsKey(item)) {
                 if (origen.getInventario().getCantidad(item) >= cantidad) {
                     try {
                         if (origen.removerItem(item, cantidad)) {
+                            LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "cargar_item", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                             cargaActual.put(item, cantidad);
                             System.out.println("Robot " + id + " cargó " + cantidad + " unidades de " + item.getNombre() + " desde " + origen.getId());
                             consumirBateria(2);
                         } else {
+                            LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "fallo_carga_item", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                             pedidoActual.marcarFallido();
                             finalizarPedido();
                             return false;
                         }
                     } catch (Exception e) {
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "excepcion_carga_item", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                         pedidoActual.marcarFallido();
                         finalizarPedido();
                         return false;
                     }
                 } else {
+                    LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "sin_stock_origen", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                     System.out.println("Robot " + id + " no pudo cargar items. Cantidad insuficiente en " + origen.getId());
                     pedidoActual.marcarFallido();
                     finalizarPedido();
@@ -300,40 +295,39 @@ public class RobotLogistico implements Ubicable {
                 }
             }
         }
-
         // 3. Moverse a una celda adyacente al cofre de destino
         if (cargaActual.containsKey(item) && !esAdyacente(posicion, destino.getPosicion())) {
-            // Si estamos muy cerca del destino, buscar una posición adyacente libre
             if (posicion.distanciaHacia(destino.getPosicion()) <= 1.5) {
                 Punto posicionAdyacente = encontrarPosicionAdyacenteLibre(destino.getPosicion());
                 if (posicionAdyacente != null) {
+                    LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "mover_adjacente_destino", posicion.toString(), posicionAdyacente.toString(), posicion.distanciaHacia(posicionAdyacente), bateriaActual + "/" + bateriaMaxima);
                     setPosicion(posicionAdyacente);
                     System.out.println("Robot " + id + " llegó a una celda adyacente al cofre de destino " + destino.getId());
                     consumirBateria(2);
                 } else {
+                    LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "fallo_adjacente_destino", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                     System.out.println("Robot " + id + " no puede encontrar posición adyacente libre al destino.");
                     pedidoActual.marcarFallido();
                     finalizarPedido();
                     return false;
                 }
             } else {
-                // Calcular el siguiente paso hacia el destino
                 Punto siguientePaso = calcularSiguientePaso(posicion, destino.getPosicion());
-                
-                // Verificar que el siguiente paso es válido
                 if (siguientePaso != null && esMovimientoValido(siguientePaso)) {
+                    LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "mover_hacia_destino", posicion.toString(), siguientePaso.toString(), posicion.distanciaHacia(siguientePaso), bateriaActual + "/" + bateriaMaxima);
                     setPosicion(siguientePaso);
                     int consumoBateria = (int) Math.ceil(posicion.distanciaHacia(siguientePaso) * ParametrosGenerales.FACTOR_CONSUMO * 1.5);
                     try {
                         consumirBateria(consumoBateria);
                         System.out.println("Robot " + id + " moviéndose hacia cofre destino. Posición: " + posicion + ", Batería: " + bateriaActual + "/" + bateriaMaxima);
                     } catch (IllegalStateException e) {
+                        LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "fallo_bateria_mov_destino", posicion.toString(), siguientePaso.toString(), posicion.distanciaHacia(siguientePaso), bateriaActual + "/" + bateriaMaxima);
                         pedidoActual.marcarFallido();
                         finalizarPedido();
                         return false;
                     }
                 } else {
-                    // No se puede mover, marcar como fallido
+                    LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "bloqueo_mov_destino", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                     System.out.println("Robot " + id + " no puede moverse hacia el destino. Posición bloqueada.");
                     pedidoActual.marcarFallido();
                     finalizarPedido();
@@ -342,36 +336,23 @@ public class RobotLogistico implements Ubicable {
             }
             return true;
         }
-
-        // 4. Entregar los items si está adyacente al destino
+        // 4. Entregar los items
         if (cargaActual.containsKey(item) && esAdyacente(posicion, destino.getPosicion())) {
             try {
-                int cantidadEntrega = cargaActual.get(item);
-                if (destino.agregarItem(item, cantidadEntrega)) {
+                destino.agregarItem(item, cantidad);
+                LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "descargar_item", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                     cargaActual.remove(item);
                     pedidoActual.marcarCompletado();
-                    System.out.println("Robot " + id + " entregó " + cantidadEntrega + " unidades de " + item.getNombre() + " a " + destino.getId() + ". Pedido completado.");
-                    consumirBateria(2);
                     finalizarPedido();
                     return false;
-                } else {
-                    System.out.println("Robot " + id + " no pudo entregar items. Cofre " + destino.getId() + " sin espacio.");
-                    pedidoActual.marcarFallido();
-                    finalizarPedido();
-                    return false;
-                }
             } catch (Exception e) {
+                LoggerMovimientosRobots.getInstancia().logMovimiento(id, cicloActual, pedidoActual.toString(), "excepcion_descarga_item", posicion.toString(), posicion.toString(), 0, bateriaActual + "/" + bateriaMaxima);
                 pedidoActual.marcarFallido();
                 finalizarPedido();
                 return false;
             }
         }
-
-        // Si llegamos aquí, algo salió mal
-        System.out.println("Robot " + id + " encontró un estado inesperado en el procesamiento del pedido.");
-        pedidoActual.marcarFallido();
-        finalizarPedido();
-        return false;
+        return true;
     }
 
     /**
