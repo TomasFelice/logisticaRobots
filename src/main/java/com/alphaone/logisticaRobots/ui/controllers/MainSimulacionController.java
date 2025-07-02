@@ -526,18 +526,51 @@ private void dibujarRobot(RobotDTO robot) {
                        radioPunto * 2, radioPunto * 2);
             pAnterior = pSiguiente;
         }
-        // Dibujar flecha en el punto final para indicar dirección
+        // Dibujar flecha en el punto final para indicar dirección (doble de grande)
         if (robot.rutaActual().size() > 1) {
             PuntoDTO penultimo = robot.rutaActual().get(robot.rutaActual().size() - 2);
             PuntoDTO ultimo = robot.rutaActual().get(robot.rutaActual().size() - 1);
-            double dx = ultimo.x() - penultimo.x();
-            double dy = ultimo.y() - penultimo.y();
+            double x1 = penultimo.x() * ESCALA_DIBUJO;
+            double y1 = penultimo.y() * ESCALA_DIBUJO;
+            double x2 = ultimo.x() * ESCALA_DIBUJO;
+            double y2 = ultimo.y() * ESCALA_DIBUJO;
+            double dx = x2 - x1;
+            double dy = y2 - y1;
             if (dx != 0 || dy != 0) {
                 double length = Math.sqrt(dx * dx + dy * dy);
-                dx = (dx / length) * 8;
-                dy = (dy / length) * 8;
+                // Doble de grande: longitud de la flecha 16 (antes era 8)
+                double arrowLength = 16;
+                double arrowHeadSize = 10; // tamaño de la cabeza de la flecha (doble de 5)
+                double unitDx = dx / length;
+                double unitDy = dy / length;
+
+                // Punto de inicio de la flecha (un poco antes del final para que la cabeza no tape el punto)
+                double startX = x2 - unitDx * 2;
+                double startY = y2 - unitDy * 2;
+                double endX = x2;
+                double endY = y2;
+
+                // Dibujar la línea principal de la flecha
+                gc.setStroke(Color.DARKGREEN);
+                gc.setLineWidth(3.0);
+                gc.strokeLine(startX - unitDx * (arrowLength - 2), startY - unitDy * (arrowLength - 2), endX, endY);
+
+                // Dibujar la cabeza de la flecha
+                double angle = Math.atan2(unitDy, unitDx);
+                double arrowAngle = Math.toRadians(25); // ángulo entre la línea y los lados de la cabeza
+
+                double xArrow1 = endX - arrowHeadSize * Math.cos(angle - arrowAngle);
+                double yArrow1 = endY - arrowHeadSize * Math.sin(angle - arrowAngle);
+
+                double xArrow2 = endX - arrowHeadSize * Math.cos(angle + arrowAngle);
+                double yArrow2 = endY - arrowHeadSize * Math.sin(angle + arrowAngle);
+
                 gc.setFill(Color.DARKGREEN);
-                gc.fillOval(ultimo.x() * ESCALA_DIBUJO - 4, ultimo.y() * ESCALA_DIBUJO - 4, 8, 8);
+                gc.fillPolygon(
+                    new double[]{endX, xArrow1, xArrow2},
+                    new double[]{endY, yArrow1, yArrow2},
+                    3
+                );
             }
         }
     }
