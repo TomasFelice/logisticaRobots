@@ -65,4 +65,10 @@ public interface ServicioSimulacion {
      */
     void removerObservador(ObservadorEstadoSimulacion observador);
 
+    /**
+     * Cambia la velocidad de simulación (milisegundos entre ciclos).
+     * @param ms Milisegundos entre ciclos de simulación.
+     */
+    void setVelocidadSimulacion(int ms);
+
 }

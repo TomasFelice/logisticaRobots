@@ -784,4 +784,25 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
 
     }
+
+    /**
+     * Permite cambiar la velocidad de simulación (milisegundos entre ciclos) en caliente.
+     * Si la simulación está corriendo, reinicia el scheduler con la nueva velocidad.
+     */
+    @Override
+    public void setVelocidadSimulacion(int ms) {
+        if (ms < 10) ms = 10; // Límite inferior para evitar valores extremos
+        this.velocidadSimulacion = ms;
+        if (enEjecucion && scheduler != null) {
+            // Reiniciar el scheduler con la nueva velocidad
+            scheduler.shutdownNow();
+            scheduler = Executors.newSingleThreadScheduledExecutor();
+            scheduler.scheduleAtFixedRate(
+                this::cicloSimulacionSeguro,
+                0,
+                velocidadSimulacion,
+                TimeUnit.MILLISECONDS
+            );
+        }
+    }
 }

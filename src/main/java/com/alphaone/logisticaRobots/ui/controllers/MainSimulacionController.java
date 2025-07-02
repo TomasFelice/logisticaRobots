@@ -14,6 +14,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
+import javafx.scene.control.Slider;
 
 import java.io.File;
 import java.util.List;
@@ -46,6 +47,10 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
     private Label labelEstadoSimulacion;
     @FXML
     private TextArea textAreaDetallesEntidad;
+    @FXML
+    private Slider sliderVelocidad;
+    @FXML
+    private Label labelVelocidadValor;
 
     // --- Dependencias ---
     private ServicioSimulacion servicioSimulacion; // Se inyectará o instanciará
@@ -125,7 +130,20 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
         // Inicialmente, no hay detalles para mostrar
         textAreaDetallesEntidad.setText("Seleccione una entidad en la grilla para ver sus detalles.");
         labelCicloActual.setText("Ciclo: N/A");
-        labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: No iniciado");
+        labelEstadoSimulacion.setText("Estado: No iniciado");
+
+        // Configurar slider de velocidad
+        if (sliderVelocidad != null && labelVelocidadValor != null) {
+            sliderVelocidad.valueProperty().addListener((obs, oldVal, newVal) -> {
+                int ms = newVal.intValue();
+                labelVelocidadValor.setText(ms + " ms");
+                if (servicioSimulacion != null) {
+                    servicioSimulacion.setVelocidadSimulacion(ms);
+                }
+            });
+            // Valor inicial
+            labelVelocidadValor.setText(((int)sliderVelocidad.getValue()) + " ms");
+        }
     }
 
     /**
@@ -140,6 +158,10 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             deshabilitarControles(false);
             botonPausar.setDisable(true);
             actualizarEstado(this.servicioSimulacion.getEstadoActualSimulacion());
+            // Inicializar el slider con la velocidad actual si es posible
+            if (sliderVelocidad != null) {
+                sliderVelocidad.setValue(1000); // Valor por defecto, o podrías obtenerlo del servicio si se expone
+            }
         }
     }
 
@@ -234,7 +256,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                 // Podría ser un estado inicial antes de cargar config
                 limpiarCanvas();
                 labelCicloActual.setText("Ciclo: N/A");
-                labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: Esperando configuración");
+                labelEstadoSimulacion.setText("Estado: Esperando configuración");
                 this.dimensionGrilla = null;
                 this.ultimosRobots = null;
                 this.ultimosCofres = null;
@@ -272,7 +294,7 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             dibujarEstado(nuevoEstado);
 
             labelCicloActual.setText("Ciclo: " + nuevoEstado.cicloActual());
-            labelEstadoSimulacion.setText("com.alphaone.logisticaRobots.domain.Estado: " + nuevoEstado.estadoGeneral());
+            labelEstadoSimulacion.setText("Estado: " + nuevoEstado.estadoGeneral());
 
             // Actualizar estado de botones según el estado de la simulación
             // Por ejemplo, si la simulación está "CORRIENDO", "PAUSADA", "FINALIZADA"
@@ -796,7 +818,7 @@ private void dibujarRobot(RobotDTO robot) {
                 sb.append("Carga: ").append(robot.cargaActual()).append(" / ").append(robot.capacidadCarga()).append("\n");
                 sb.append("Items en carga: \n");
                 robot.itemsEnCarga().forEach((item, cant) -> sb.append("  - ").append(item).append(": ").append(cant).append("\n"));
-                sb.append("com.alphaone.logisticaRobots.domain.Estado: ").append(robot.estadoActual()).append("\n");
+                sb.append("Estado: ").append(robot.estadoActual()).append("\n");
                 if (robot.rutaActual() != null && !robot.rutaActual().isEmpty()) {
                     sb.append("Ruta: ").append(robot.rutaActual().size()).append(" pasos\n");
                     
