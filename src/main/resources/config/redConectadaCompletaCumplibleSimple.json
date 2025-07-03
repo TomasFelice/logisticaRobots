@@ -25,7 +25,7 @@
   "robots": [
     {
       "id": "R_1",
-      "robopuertoInicialId": "RP_Centro",
+      "robopuertoInicialId": "RP_Esquina",
       "capacidadMaximaBateria": 100,
       "cargaBateriaActual": 100,
       "capacidadTraslado": 5,

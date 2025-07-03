@@ -1,0 +1,38 @@
+{
+  "grilla": {
+    "dimensiones": {
+      "ancho": 20,
+      "alto": 20
+    }
+  },
+  "factorConsumo": 1.0,
+  "robopuertos": [
+    { "id": "RP1", "posicion": { "x": 5, "y": 10 }, "alcance": 7, "cargasSimultaneas": 1, "estado": "activo" },
+    { "id": "RP2", "posicion": { "x": 15, "y": 10 }, "alcance": 7, "cargasSimultaneas": 1, "estado": "activo" },
+    { "id": "RP3", "posicion": { "x": 10, "y": 18 }, "alcance": 7, "cargasSimultaneas": 1, "estado": "activo" }
+  ],
+  "robots": [
+    { "id": "R1", "robopuertoInicialId": "RP1", "capacidadMaximaBateria": 30, "cargaBateriaActual": 30, "capacidadTraslado": 5, "estado": "disponible" },
+    { "id": "R2", "robopuertoInicialId": "RP2", "capacidadMaximaBateria": 30, "cargaBateriaActual": 30, "capacidadTraslado": 5, "estado": "disponible" },
+    { "id": "R3", "robopuertoInicialId": "RP3", "capacidadMaximaBateria": 30, "cargaBateriaActual": 30, "capacidadTraslado": 5, "estado": "disponible" }
+  ],
+  "items": [
+    { "nombre": "piezaA" },
+    { "nombre": "piezaB" },
+    { "nombre": "piezaC" }
+  ],
+  "cofres": [
+    { "id": "C1", "posicion": { "x": 3, "y": 12 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaA": "comportamiento_provision_activa" }, "itemsAlmacenados": [ { "item": "piezaA", "cantidad": 5 } ] },
+    { "id": "C2", "posicion": { "x": 7, "y": 7 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaB": "comportamiento_provision_activa" }, "itemsAlmacenados": [ { "item": "piezaB", "cantidad": 5 } ] },
+    { "id": "C3", "posicion": { "x": 13, "y": 7 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaC": "comportamiento_provision_activa" }, "itemsAlmacenados": [ { "item": "piezaC", "cantidad": 5 } ] },
+    { "id": "C4", "posicion": { "x": 17, "y": 12 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaA": "comportamiento_solicitud" }, "itemsAlmacenados": [] },
+    { "id": "C5", "posicion": { "x": 12, "y": 15 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaB": "comportamiento_solicitud" }, "itemsAlmacenados": [] },
+    { "id": "C6", "posicion": { "x": 8, "y": 15 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaC": "comportamiento_solicitud" }, "itemsAlmacenados": [] },
+    { "id": "C_Rojo", "posicion": { "x": 2, "y": 18 }, "capacidadMaxima": 10, "comportamientoDefecto": "comportamiento_almacenamiento", "comportamientosPorItem": { "piezaA": "comportamiento_provision_activa" }, "itemsAlmacenados": [ { "item": "piezaA", "cantidad": 5 } ] }
+  ],
+  "pedidos": [
+    { "id": "PED1", "itemNombre": "piezaA", "cantidad": 2, "cofreDestinoId": "C4" },
+    { "id": "PED2", "itemNombre": "piezaB", "cantidad": 2, "cofreDestinoId": "C5" },
+    { "id": "PED3", "itemNombre": "piezaC", "cantidad": 2, "cofreDestinoId": "C6" }
+  ]
+}
