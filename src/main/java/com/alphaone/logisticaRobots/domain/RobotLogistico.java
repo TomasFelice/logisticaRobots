@@ -362,19 +362,34 @@ public class RobotLogistico implements Ubicable {
                 .filter(this::esMovimientoValido)
                 .collect(Collectors.toList());
         
-        // Si no hay movimientos válidos, retornar null
-        if (movimientosValidos.isEmpty()) {
-            System.out.println("Robot " + id + ": No hay movimientos válidos hacia " + destino);
-            return null;
+        // Si hay movimientos válidos hacia el destino, elegir el mejor
+        if (!movimientosValidos.isEmpty()) {
+            Punto mejorMovimiento = movimientosValidos.stream()
+                    .min(Comparator.comparingDouble(p -> p.distanciaHacia(destino)))
+                    .orElse(movimientosValidos.get(0));
+            System.out.println("Robot " + id + ": Movimiento seleccionado hacia " + mejorMovimiento + " (destino: " + destino + ")");
+            return mejorMovimiento;
         }
-        
-        // Elegir el movimiento que más se acerque al destino
-        Punto mejorMovimiento = movimientosValidos.stream()
-                .min(Comparator.comparingDouble(p -> p.distanciaHacia(destino)))
-                .orElse(movimientosValidos.get(0));
-        
-        System.out.println("Robot " + id + ": Movimiento seleccionado hacia " + mejorMovimiento + " (destino: " + destino + ")");
-        return mejorMovimiento;
+
+        // Si no hay movimientos válidos, verificar si el bloqueo es por otro robot
+        boolean bloqueoPorRobot = false;
+        for (Punto mov : movimientosPosibles) {
+            if (hayRobotEnPosicion(mov)) {
+                bloqueoPorRobot = true;
+                break;
+            }
+        }
+        // Si el bloqueo es por otro robot, intentar moverse a cualquier celda adyacente libre
+        if (bloqueoPorRobot) {
+            Punto evasion = encontrarPosicionAdyacenteLibre(posicionActual);
+            if (evasion != null) {
+                System.out.println("Robot " + id + ": Deadlock detectado, evadiendo a " + evasion);
+                return evasion;
+            }
+        }
+        // Si no hay forma de evadir, retornar null
+        System.out.println("Robot " + id + ": No hay movimientos válidos hacia " + destino);
+        return null;
     }
 
     /**
@@ -387,17 +402,20 @@ public class RobotLogistico implements Ubicable {
     private boolean esMovimientoValido(Punto nuevaPosicion, Punto destinoFinal) {
         System.out.println("Robot " + id + ": Verificando movimiento a posición " + nuevaPosicion);
         
-        // Verificar que no se solape con otros robots
-        if (hayRobotEnPosicion(nuevaPosicion)) {
-            System.out.println("Robot " + id + ": Movimiento inválido - colisión con robot");
-            return false;
-        }
-        
-        // Solo permitir entrar a un robopuerto si es el destino final
+        // Verificar si la posición es un robopuerto
         boolean esRobopuerto = false;
         if (redLogistica != null) {
             esRobopuerto = redLogistica.getRobopuertos().stream().anyMatch(rp -> rp.getPosicion().equals(nuevaPosicion));
         }
+        // Si NO es robopuerto, verificar colisión con otros robots
+        if (!esRobopuerto) {
+            if (hayRobotEnPosicion(nuevaPosicion)) {
+                System.out.println("Robot " + id + ": Movimiento inválido - colisión con robot");
+                return false;
+            }
+        }
+        
+        // Solo permitir entrar a un robopuerto si es el destino final
         if (esRobopuerto && (destinoFinal == null || !nuevaPosicion.equals(destinoFinal))) {
             System.out.println("Robot " + id + ": Movimiento inválido - no puede atravesar robopuerto que no es destino final");
             return false;
