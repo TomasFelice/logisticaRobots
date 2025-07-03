@@ -40,7 +40,7 @@ public class MainApplication extends Application {
             // Cargar configuración por defecto al iniciar
             try {
                 // Obtener el archivo de configuración desde resources
-                java.net.URL configUrl = getClass().getResource("/config/prueba.json");
+                java.net.URL configUrl = getClass().getResource("/config/redConectadaCompletaCumplible.json");
                 if (configUrl != null) {
                     java.io.File configFile = new java.io.File(configUrl.toURI());
                     servicioSimulacion.cargarConfiguracion(configFile);
