@@ -71,4 +71,5 @@ public interface ServicioSimulacion {
      */
     void setVelocidadSimulacion(int ms);
 
+    boolean isEnEjecucion();
 }

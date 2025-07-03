@@ -843,4 +843,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             );
         }
     }
+
+    @Override
+    public boolean isEnEjecucion() {
+        return enEjecucion;
+    }
 }

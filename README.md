@@ -1,4 +1,4 @@
-# logisticaRobots
+# Logística de Robots
 
 ## Descripción
 Sistema de simulación logística con robots autónomos, cofres y robopuertos, visualizado mediante una interfaz gráfica JavaFX. Permite cargar configuraciones de red, simular pedidos y observar el comportamiento de los robots en tiempo real.

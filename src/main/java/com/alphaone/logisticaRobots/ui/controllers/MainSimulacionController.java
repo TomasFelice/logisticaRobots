@@ -307,12 +307,28 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
             // Actualizar estado de botones según el estado de la simulación
             // Por ejemplo, si la simulación está "CORRIENDO", "PAUSADA", "FINALIZADA"
             String estadoSim = nuevoEstado.estadoGeneral() != null ? nuevoEstado.estadoGeneral().toUpperCase() : "";
+            boolean enEjecucion = false;
+            // Intentar obtener si está en ejecución automática
+            try {
+                // Si el servicio tiene el método isEnEjecucion, lo usamos
+                java.lang.reflect.Method metodo = servicioSimulacion.getClass().getMethod("isEnEjecucion");
+                enEjecucion = (boolean) metodo.invoke(servicioSimulacion);
+            } catch (Exception e) {
+                // Si no existe el método, asumimos false (modo manual)
+                enEjecucion = false;
+            }
             switch (estadoSim) {
                 case "INICIADA":
                 case "CORRIENDO": // Asumiendo que "INICIADA" puede transicionar a "CORRIENDO"
-                    botonIniciar.setDisable(true);
-                    botonPausar.setDisable(false);
-                    botonAvanzarCiclo.setDisable(true);
+                    if (enEjecucion) {
+                        botonIniciar.setDisable(true);
+                        botonPausar.setDisable(false);
+                        botonAvanzarCiclo.setDisable(true);
+                    } else {
+                        botonIniciar.setDisable(false);
+                        botonPausar.setDisable(true);
+                        botonAvanzarCiclo.setDisable(false);
+                    }
                     alertaEstadoEstableMostrada = false;
                     break;
                 case "PAUSADA":
