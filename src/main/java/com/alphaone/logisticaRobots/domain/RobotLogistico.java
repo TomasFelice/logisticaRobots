@@ -15,12 +15,11 @@ public class RobotLogistico implements Ubicable {
     private final int id;
     private Punto posicion;
     private final int bateriaMaxima;
-    private int bateriaActual;  // Cambiado a entero simple
+    private int bateriaActual;
     private final static int capacidadPedidosTraslado = 10; // Los robots transportan una cantidad predefinida de ítems en cada viaje. Esta cantidad debe ser configurable a nivel global al momento de correr la simulación.
     private EstadoRobot estado;
     private Map<Item, Integer> cargaActual;  // Los ítems que está transportando y su cantidad
     private final Robopuerto robopuertoBase; // el robot empieza en un nodo del camino y puede desplazarse a otro en base a los nodos, sus pesos y cantidad de robots que se tenga
-    private Queue<Pedido> pedidosEncolados; // debe tener una cola de pedidos [TODO] Cambiar por cola de prioridad
     private final Queue<Pedido> pedidosPendientes = new LinkedList<>();
     private final List<Pedido> historialPedidos = new ArrayList<>();
 
@@ -35,31 +34,13 @@ public class RobotLogistico implements Ubicable {
         this.estado = EstadoRobot.ACTIVO; // com.alphaone.logisticaRobots.domain.Estado inicial
         this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
         this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
-        this.pedidosEncolados = new LinkedList<>();
-    }
-
-    public RobotLogistico(int id, Punto posicion, Robopuerto robopuertoBase, int bateriaMaxima, int capacidadPedidosTraslado, RedLogistica redLogistica) {
-        this.id = id;
-        this.posicion = Objects.requireNonNull(posicion, "Posición no puede ser null");
-        this.bateriaMaxima = validarBateria(bateriaMaxima);
-        this.bateriaActual = this.bateriaMaxima;  // Inicia con la batería llena
-        this.estado = EstadoRobot.ACTIVO; // com.alphaone.logisticaRobots.domain.Estado inicial
-        this.cargaActual = new HashMap<>();  // Debemos inicializarlo con la carga máxima. PENDIENTE (Deberíamos hacer un inventarios también?
-        this.robopuertoBase = Objects.requireNonNull(robopuertoBase); // de algún lado tiene que empezar el robot
-        this.pedidosEncolados = new LinkedList<>();
-        this.redLogistica = redLogistica;
     }
 
     //Getters:
     public int getId() {return id;}
     public Robopuerto getRobopuertoBase() {return robopuertoBase;}
     public Map<Item, Integer> getCargaActual() {return cargaActual;}
-    public int getCantidadPedidosEncolados() {return pedidosEncolados.size();}
-    public int getCantidadPedidosPendientes() {return pedidosPendientes.size();}
-    public int getCantidadHistorialPedidos() {return historialPedidos.size();}
-    public int getCantidadPedidos() {return historialPedidos.size() + pedidosPendientes.size();}
     public int getCantidadPedidosEnProceso() {return (pedidoActual != null) ? 1 : 0;}
-    public int getCantidadPedidosCompletados() {return historialPedidos.size();}
 
     public int getBateriaActual() {return bateriaActual;}
     public int getBateriaMaxima() {return bateriaMaxima;}
@@ -98,29 +79,6 @@ public class RobotLogistico implements Ubicable {
         return redLogistica != null;
     }
 
-    // Métodos para manejar los estados del robot
-
-    /*
-    public void iniciarMision() {
-        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.EN_MISION);
-    }
-
-    public void ponerEnEspera() {
-        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.PASIVO);
-    }
-
-    public void iniciarRecarga() {
-        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.CARGANDO);
-    }
-
-    public void activar() {
-        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.ACTIVO);
-    }
-
-    public void desactivar() {
-        cambiarEstado(com.alphaone.logisticaRobots.domain.EstadoRobot.INACTIVO);
-    }
-    esto tal vez se saque ya que para eso hice la clase "cambiarEstado"*/
     public void agregarPedido(Pedido pedido) {
         if (pedido == null) throw new IllegalArgumentException("El pedido no puede ser null");
         pedidosPendientes.add(pedido);
@@ -721,56 +679,6 @@ public class RobotLogistico implements Ubicable {
     public boolean puedeCargar(int cantidad) {
         int cargaTotal = cargaActual.values().stream().mapToInt(Integer::intValue).sum();
         return cargaTotal + cantidad <= capacidadPedidosTraslado;
-    }
-
-
-    public void cargarDesdeCofre(CofreLogistico cofre) {
-
-        Inventario inventarioCofre = cofre.getInventario();
-
-        if (inventarioCofre.estaVacio()) {
-            throw new IllegalArgumentException("El cofre está vacío, no hay items para cargar");
-        }
-
-        int totalDisponibleEnCofre = inventarioCofre.getTotalItems();
-
-        if (!puedeCargar(totalDisponibleEnCofre)) {
-            throw new IllegalArgumentException(
-                    String.format("El robot no puede cargar %d unidades (capacidad: %d)",
-                            totalDisponibleEnCofre, capacidadPedidosTraslado)
-            );
-        }
-
-        // Si pasó todas las validaciones, proceder a transferir todos los items
-        Map<Item, Integer> itemsATransferir = new HashMap<>(inventarioCofre.getTodos());
-
-        for (Map.Entry<Item, Integer> entry : itemsATransferir.entrySet()) {
-            Item item = entry.getKey();
-            int cantidad = entry.getValue();
-
-            if (cantidad > 0 && inventarioCofre.remover(item, cantidad)) {
-                cargaActual.merge(item, cantidad, Integer::sum);
-            }
-        }
-    }
-
-    public void descargarACofre(CofreLogistico cofre) {
-
-        if (cargaActual == null || cargaActual.isEmpty()) {
-            throw new IllegalArgumentException("El robot no tiene carga para descargar");
-        }
-
-        Inventario inventarioCofre = cofre.getInventario();
-
-        for (Map.Entry<Item, Integer> entry : new HashMap<>(cargaActual).entrySet()) {
-            Item item = entry.getKey();
-            int cantidad = entry.getValue();
-
-            if (cantidad > 0) {
-                inventarioCofre.agregar(item, cantidad);
-                cargaActual.remove(item);
-            }
-        }
     }
 
     /**

@@ -88,18 +88,9 @@ public class CofreLogistico implements Ubicable {
         return comportamiento != null && comportamiento.puedeSolicitar(item, cantidad, this);
     }
 
-    public int getPrioridadSolicitud(Item item) {
-        ComportamientoCofre comportamiento = getComportamiento(item);
-        return comportamiento != null ? comportamiento.getPrioridadSolicitud(item, this) : 0;
-    }
-
     public String getTipoComportamiento(Item item) {
         ComportamientoCofre comportamiento = getComportamiento(item);
         return comportamiento != null ? comportamiento.getTipo() : "Sin comportamiento";
-    }
-
-    public int getEspacioDisponible() {
-        return capacidadMaxima - inventario.getTotalItems();
     }
 
     @Override

@@ -48,8 +48,6 @@ public class Robopuerto implements Ubicable {
         this.posicion = posicion;
     }
 
-    //INICIO - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia
-
     private double validarDistancia(double distancia) {
         if (distancia <= 0) {
             throw new IllegalArgumentException("La distancia máxima debe ser positiva");
@@ -61,8 +59,6 @@ public class Robopuerto implements Ubicable {
         return posicion.distanciaHacia(otraUbicacion) <= alcance;
     }
 
-    //FIN - esto tal vez debamos ponerlo en una clase superior porque muchas clases validan distancia
-
     // Manejo de Cofres:
 
     public void conectarCofre(CofreLogistico cofre) {
@@ -70,12 +66,6 @@ public class Robopuerto implements Ubicable {
             cofresConectados.add(cofre);
         } else {
             throw new IllegalArgumentException("El cofre está fuera del área de cobertura");
-        }
-    }
-
-    public void desconectarCofre(CofreLogistico cofre) {
-        if (!cofresConectados.remove(cofre)) {
-            throw new IllegalArgumentException("El cofre no estaba conectado a este robopuerto");
         }
     }
 

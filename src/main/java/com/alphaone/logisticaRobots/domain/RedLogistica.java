@@ -57,39 +57,6 @@ public class RedLogistica { // es el universo donde se componen las cosas
         return pedidos;
     }
 
-    public void agregarRobopuerto(Robopuerto robopuerto) {
-        this.robopuertos.add(robopuerto);
-    }
-
-    public void eliminarRobopuerto(Robopuerto robopuerto) {
-        this.robopuertos.remove(robopuerto);
-    }
-
-    public void agregarCofre(CofreLogistico cofre) {
-        this.cofres.add(cofre);
-    }
-
-    public void eliminarCofre(CofreLogistico cofre) {
-        this.cofres.remove(cofre);
-    }
-
-    public void agregarRobot(RobotLogistico robot) {
-        this.robotsLogisticos.add(robot);
-        robot.setRedLogistica(this);
-    }
-
-    public void eliminarRobot(RobotLogistico robot) {
-        this.robotsLogisticos.remove(robot);
-    }
-
-    public void agregarPedido(Pedido pedido) {
-        this.pedidos.add(pedido);
-    }
-
-    public void eliminarPedido(Pedido pedido) {
-        this.pedidos.remove(pedido);
-    }
-
     public boolean estaVacia() {
         return
             robopuertos.isEmpty()
@@ -171,8 +138,6 @@ public class RedLogistica { // es el universo donde se componen las cosas
     /**
      * Indica que ya cumplió con todos los pedidos y no tiene más
      * Movimientos pendientes
-     *
-     * @return boolean
      */
     public boolean haAlcanzadoEstadoEstable() {
         // Verificar si hay pedidos pendientes
