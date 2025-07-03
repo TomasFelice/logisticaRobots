@@ -99,34 +99,6 @@ public class Planificador { //lo está haciendo tomi
         return true;
     }
 
-    /**
-     * TODO: Corregir este método, no hace lo que dice.
-     *  Analizar la posibilidad de usar un Warshall para esto, dado que la consulta será O(1) una vez que tenemos armada la matriz
-     * Determina si dos puntos están conectados en la red logística.
-     * Dos puntos están conectados si están dentro de la grilla espacial
-     * y la distancia entre ellos es razonable para que un robot pueda recorrerla.
-     *
-     * @param origen Punto de origen
-     * @param destino Punto de destino
-     * @return true si los puntos están conectados, false en caso contrario
-     */
-    private boolean estanConectados(Punto origen, Punto destino) {
-        // TODO: Eliminar esta validacion. La grilla es unica. Verificar que ambos puntos estén dentro de la grilla espacial
-        if (!grillaEspacial.dentroDeGrilla(origen) || !grillaEspacial.dentroDeGrilla(destino)) {
-            return false;
-        }
-
-        // Calcular la distancia entre los puntos
-        double distancia = origen.distanciaHacia(destino);
-
-        // Determinar si la distancia es razonable para un robot
-        // Esto podría depender de la capacidad de batería de los robots
-        // Por ahora, usamos un valor arbitrario como límite
-        double distanciaMaxima = 50.0; // Valor arbitrario
-
-        return distancia <= distanciaMaxima;
-    }
-
     // Contador para generar IDs únicos para las rutas
     private static final AtomicInteger rutaIdCounter = new AtomicInteger(1);
 
