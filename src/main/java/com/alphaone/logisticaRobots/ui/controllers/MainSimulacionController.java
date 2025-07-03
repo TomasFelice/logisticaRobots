@@ -326,7 +326,8 @@ public class MainSimulacionController implements ObservadorEstadoSimulacion {
                     botonPausar.setDisable(true);
                     botonAvanzarCiclo.setDisable(false); // Permitir avanzar si está finalizada o error podría ser opcional
                     if (!alertaEstadoEstableMostrada) {
-                        showAlert(Alert.AlertType.INFORMATION, "Simulación finalizada", "La simulación ha alcanzado un estado estable.");
+                        String resumenPedidos = generarResumenPedidos(nuevoEstado.pedidos());
+                        showAlert(Alert.AlertType.INFORMATION, "Simulación finalizada", "La simulación ha alcanzado un estado estable.\n\n" + resumenPedidos);
                         alertaEstadoEstableMostrada = true;
                     }
                     break;
@@ -902,5 +903,30 @@ private void dibujarRobot(RobotDTO robot) {
             alert.setContentText(mensaje);
             alert.showAndWait();
         });
+    }
+
+    // --- Métodos auxiliares para resumen de pedidos ---
+    private String generarResumenPedidos(java.util.List<com.alphaone.logisticaRobots.application.dto.PedidoDTO> pedidos) {
+        if (pedidos == null || pedidos.isEmpty()) {
+            return "No hay pedidos en la simulación.";
+        }
+        long completados = pedidos.stream().filter(p -> "COMPLETADO".equalsIgnoreCase(p.estado())).count();
+        long fallidos = pedidos.stream().filter(p -> "FALLIDO".equalsIgnoreCase(p.estado())).count();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Resumen de pedidos:\n");
+        sb.append("Completados: ").append(completados).append("\n");
+        sb.append("Fallidos: ").append(fallidos).append("\n");
+        if (fallidos > 0) {
+            sb.append("\nPedidos fallidos:\n");
+            pedidos.stream()
+                .filter(p -> "FALLIDO".equalsIgnoreCase(p.estado()))
+                .forEach(p -> sb.append("- Item: ")
+                                .append(p.itemNombre())
+                                .append(", Cantidad: ").append(p.cantidad())
+                                .append(", Cofre destino: ").append(p.cofreDestinoId())
+                                .append(", Prioridad: ").append(p.prioridad())
+                                .append("\n"));
+        }
+        return sb.toString();
     }
 }

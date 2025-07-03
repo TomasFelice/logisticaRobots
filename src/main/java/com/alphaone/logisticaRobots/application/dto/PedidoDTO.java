@@ -8,6 +8,7 @@ public record PedidoDTO(
     String itemNombre,
     int cantidad,
     String cofreDestinoId,
-    String prioridad // "ALTA", "MEDIA", "BAJA"
+    String prioridad, // "ALTA", "MEDIA", "BAJA"
+    String estado // "NUEVO", "EN_PROCESO", "COMPLETADO", "FALLIDO"
 ) {
 } 

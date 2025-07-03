@@ -489,7 +489,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                     new DimensionGrillaDTO(anchoGrilla, altoGrilla),
                     estadoGeneral,
                     cicloActual,
-                    mensajeEstado
+                    mensajeEstado,
+                    new ArrayList<>() // pedidos vacíos
             );
         }
 
@@ -497,6 +498,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         List<RobotDTO> robotDTOs = convertirRobotsADTOs();
         List<CofreDTO> cofreDTOs = convertirCofresADTOs();
         List<RobopuertoDTO> robopuertoDTOs = convertirRobopuertosADTOs();
+        List<PedidoDTO> pedidoDTOs = convertirPedidosADTOs();
 
         return new EstadoSimulacionDTO(
                 robotDTOs,
@@ -505,7 +507,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 new DimensionGrillaDTO(anchoGrilla, altoGrilla),
                 estadoGeneral,
                 cicloActual,
-                mensajeEstado
+                mensajeEstado,
+                pedidoDTOs
         );
     }
 
@@ -613,6 +616,20 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             resultado.add(rpDTO);
         }
 
+        return resultado;
+    }
+
+    private List<PedidoDTO> convertirPedidosADTOs() {
+        List<PedidoDTO> resultado = new ArrayList<>();
+        for (Pedido pedido : redLogistica.getPedidos()) {
+            String id = pedido.getItem().getNombre() + "-" + pedido.getCofreOrigen().getId() + "-" + pedido.getCofreDestino().getId();
+            String itemNombre = pedido.getItem().getNombre();
+            int cantidad = pedido.getCantidad();
+            String cofreDestinoId = pedido.getCofreDestino().getId();
+            String prioridad = pedido.getPrioridad().name();
+            String estado = pedido.getEstado().name();
+            resultado.add(new PedidoDTO(id, itemNombre, cantidad, cofreDestinoId, prioridad, estado));
+        }
         return resultado;
     }
 

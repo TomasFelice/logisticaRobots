@@ -259,7 +259,7 @@ public class LogisticaRobotsConfigLoader {
                 String prioridad = pedidoNode.has("prioridad") ? pedidoNode.get("prioridad").asText() : "MEDIA";
 
                 // Crear el DTO de pedido
-                PedidoDTO pedidoDTO = new PedidoDTO(id, itemNombre, cantidad, cofreDestinoId, prioridad);
+                PedidoDTO pedidoDTO = new PedidoDTO(id, itemNombre, cantidad, cofreDestinoId, prioridad, "NUEVO");
                 pedidos.add(pedidoDTO);
             }
         }

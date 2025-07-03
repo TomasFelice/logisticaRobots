@@ -13,7 +13,8 @@ public record EstadoSimulacionDTO(
         DimensionGrillaDTO dimensionGrilla,
         String estadoGeneral, // Ej: "INICIADA", "PAUSADA", "FINALIZADA_ESTABLE", "ERROR"
         int cicloActual,
-        String mensajeEstado // Para mostrar mensajes relevantes en la UI
+        String mensajeEstado, // Para mostrar mensajes relevantes en la UI
+        List<PedidoDTO> pedidos
 ) {
 }
 
