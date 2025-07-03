@@ -16,6 +16,7 @@ public class LoggerMovimientosRobots {
     private final File archivo;
     private final Set<RobotLogistico> robotsRegistrados = new HashSet<>();
     private String informacionCofresInaccesibles = "";
+    private String informacionPedidosFallidos = "";
     
     private LoggerMovimientosRobots(String nombreArchivo) {
         // Obtener fecha y hora actual
@@ -58,6 +59,17 @@ public class LoggerMovimientosRobots {
         this.informacionCofresInaccesibles = informacion;
     }
     
+    public synchronized void agregarInformacionPedidosFallidos(List<com.alphaone.logisticaRobots.domain.Pedido> pedidosFallidos) {
+        if (pedidosFallidos == null || pedidosFallidos.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        sb.append("PEDIDOS FALLIDOS:\n");
+        sb.append("-".repeat(40)).append("\n");
+        for (com.alphaone.logisticaRobots.domain.Pedido pedido : pedidosFallidos) {
+            sb.append(pedido.toString()).append("\n");
+        }
+        this.informacionPedidosFallidos = sb.toString();
+    }
+    
     public synchronized void guardar() {
         try (PrintWriter pw = new PrintWriter(new FileWriter(archivo))) {
             // Obtener fecha y hora para el encabezado
@@ -87,6 +99,12 @@ public class LoggerMovimientosRobots {
             pw.println("                           FIN DE PEDIDOS");
             pw.println("=".repeat(80));
             pw.println();
+            
+            // Información de pedidos fallidos si existe
+            if (!informacionPedidosFallidos.isEmpty()) {
+                pw.println(informacionPedidosFallidos);
+                pw.println();
+            }
             
             // Información de cofres inaccesibles si existe
             if (!informacionCofresInaccesibles.isEmpty()) {
