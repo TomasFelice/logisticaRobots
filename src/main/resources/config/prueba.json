@@ -1,0 +1,87 @@
+{
+  "grilla": {
+    "dimensiones": {
+      "ancho": 20,
+      "alto": 25
+    }
+  },
+  "factorConsumo": 1.2,
+  "robopuertos": [
+    {
+      "id": "RP_Norte",
+      "posicion": { "x": 3, "y": 20 },
+      "alcance": 5,
+      "cargasSimultaneas": 1,
+      "estado": "activo"
+    },
+    {
+      "id": "RP_Sur",
+      "posicion": { "x": 18, "y": 2 },
+      "alcance": 4,
+      "cargasSimultaneas": 2,
+      "estado": "activo"
+    }
+  ],
+  "robots": [
+    {
+      "id": "R_Alpha",
+      "robopuertoInicialId": "RP_Norte",
+      "capacidadMaximaBateria": 80,
+      "cargaBateriaActual": 70,
+      "capacidadTraslado": 4,
+      "estado": "disponible"
+    },
+    {
+      "id": "R_Beta",
+      "robopuertoInicialId": "RP_Sur",
+      "capacidadMaximaBateria": 90,
+      "cargaBateriaActual": 90,
+      "capacidadTraslado": 3,
+      "estado": "disponible"
+    }
+  ],
+  "items": [
+    { "nombre": "piezaB" },
+    { "nombre": "piezaC" }
+  ],
+  "cofres": [
+    {
+      "id": "C_Norte",
+      "posicion": { "x": 4, "y": 19 },
+      "capacidadMaxima": 8,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": { "piezaB": "comportamiento_solicitud" },
+      "itemsAlmacenados": []
+    },
+    {
+      "id": "C_Sur",
+      "posicion": { "x": 17, "y": 3 },
+      "capacidadMaxima": 12,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": { "piezaC": "comportamiento_provision_activa" },
+      "itemsAlmacenados": [ { "item": "piezaC", "cantidad": 5 } ]
+    },
+    {
+      "id": "C_Centro",
+      "posicion": { "x": 10, "y": 12 },
+      "capacidadMaxima": 15,
+      "comportamientoDefecto": "comportamiento_almacenamiento",
+      "comportamientosPorItem": {},
+      "itemsAlmacenados": [ { "item": "piezaB", "cantidad": 3 } ]
+    }
+  ],
+  "pedidos": [
+    {
+      "id": "PED_B_1",
+      "itemNombre": "piezaB",
+      "cantidad": 2,
+      "cofreDestinoId": "C_Norte"
+    },
+    {
+      "id": "PED_C_1",
+      "itemNombre": "piezaC",
+      "cantidad": 2,
+      "cofreDestinoId": "C_Centro"
+    }
+  ]
+}

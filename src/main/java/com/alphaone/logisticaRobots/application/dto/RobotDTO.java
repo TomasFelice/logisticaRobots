@@ -15,6 +15,7 @@ public record RobotDTO(
     int capacidadCarga,
     Map<String, Integer> itemsEnCarga, // ItemID a cantidad
     String estadoActual, // Ej: "Moviendose", "Cargando", "Esperando"
-    List<PuntoDTO> rutaActual // Opcional, para visualización
+    List<PuntoDTO> rutaActual, // Opcional, para visualización
+    String robopuertoBaseId // ID del robopuerto base del robot
 ) {
 }
