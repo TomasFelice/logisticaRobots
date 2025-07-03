@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Objects;
 
 /**
@@ -39,7 +40,6 @@ public class MainApplication extends Application {
 
             // Cargar configuración por defecto al iniciar
             try {
-                // Obtener el archivo de configuración desde resources
                 java.net.URL configUrl = getClass().getResource("/config/redConectadaCompletaCumplibleSimple.json");
                 if (configUrl != null) {
                     java.io.File configFile = new java.io.File(configUrl.toURI());
@@ -56,10 +56,7 @@ public class MainApplication extends Application {
             Scene scene = new Scene(root, 1200, 800);
             scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
             
-            primaryStage.setTitle("Sistema Logístico Automatizado");
-            
-            // Opcional: Configurar icono
-            // primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/com/alphaone/logisticaRobots/ui/images/logo.png")));
+            primaryStage.setTitle("Simulación Logística de Robots");
             
             primaryStage.setScene(scene);
             primaryStage.show();

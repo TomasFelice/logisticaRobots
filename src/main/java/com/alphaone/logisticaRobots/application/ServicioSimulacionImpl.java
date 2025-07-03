@@ -7,9 +7,6 @@ import com.alphaone.logisticaRobots.domain.pathfinding.GrillaEspacial;
 import com.alphaone.logisticaRobots.domain.pathfinding.Punto;
 import com.alphaone.logisticaRobots.infrastructure.config.LogisticaRobotsConfigLoader;
 import com.alphaone.logisticaRobots.ui.ObservadorEstadoSimulacion;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.alphaone.logisticaRobots.infrastructure.logging.LoggerMovimientosRobots;
@@ -186,7 +183,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public void cargarConfiguracion(File archivoConfig) throws Exception {
-        Objects.requireNonNull(archivoConfig, "El archivo no puede ser null");
+        requireNonNull(archivoConfig, "El archivo no puede ser null");
 
         if (!archivoConfig.exists() || !archivoConfig.canRead()) {
             throw new IllegalArgumentException("Archivo no existe o no se puede leer: " + archivoConfig.getPath());
@@ -249,9 +246,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 
                 // Cargar inventario inicial si existe
                 if (cofreDTO.inventario() != null) {
-                    cofreDTO.inventario().entrySet().forEach(entry -> {
-                        Item item = new Item(entry.getKey(), entry.getKey());
-                        cofre.agregarItem(item, entry.getValue());
+                    cofreDTO.inventario().forEach((key, value) -> {
+                        Item item = new Item(key, key);
+                        cofre.agregarItem(item, value);
                     });
                 }
                 
@@ -315,7 +312,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         logger.info("Configuración cargada desde {}", archivoConfig.getPath());
     }
 
-    // Método auxiliar para cargar pedidos desde la configuración JSON
+    // Metodo auxiliar para cargar pedidos desde la configuración JSON
     private void cargarPedidosDesdeConfiguracion(ConfiguracionSimulacionDTO configuracion, Set<CofreLogistico> cofres, List<Pedido> pedidosGenerados) {
         if (configuracion.cofres() == null || configuracion.cofres().isEmpty()) {
             return;
@@ -406,57 +403,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         
         return switch (prioridadStr.toUpperCase()) {
             case "ALTA" -> Pedido.PrioridadPedido.ALTA;
-            case "MEDIA" -> Pedido.PrioridadPedido.MEDIA;
             case "BAJA" -> Pedido.PrioridadPedido.BAJA;
             case "NO_APLICA" -> Pedido.PrioridadPedido.NO_APLICA;
             default -> Pedido.PrioridadPedido.MEDIA;
         };
     }
-
-
-
-    private static Pedido.PrioridadPedido getPrioridadPedido(int prioridadValor) {
-        Pedido.PrioridadPedido prioridad;
-
-        // Mapear el valor de prioridad al enum PrioridadPedido
-        if (prioridadValor == 3) {
-            prioridad = Pedido.PrioridadPedido.ALTA;
-        } else if (prioridadValor == 2) {
-            prioridad = Pedido.PrioridadPedido.MEDIA;
-        } else if (prioridadValor == 1) {
-            prioridad = Pedido.PrioridadPedido.BAJA;
-        } else {
-            // Valor por defecto si no se puede determinar la prioridad
-            prioridad = Pedido.PrioridadPedido.MEDIA;
-        }
-        return prioridad;
-    }
-
-    /**
-     * Determina la prioridad del pedido basada en el tipo de comportamiento del cofre
-     * Orden de prioridad: proveedores activos, búfer, pasivos
-     */
-    private Pedido.PrioridadPedido determinarPrioridadPorComportamiento(CofreLogistico cofre, Item item) {
-        String tipo = cofre.getTipoComportamiento(item);
-
-        // Convertir a minúsculas para hacer la comparación insensible a mayúsculas/minúsculas
-        String tipoLower = tipo.toLowerCase();
-
-        // Determinar prioridad según el tipo de comportamiento
-        if (tipoLower.contains("activa") || tipoLower.contains("provision activa")) {
-            return Pedido.PrioridadPedido.ALTA; // Proveedores activos tienen la mayor prioridad
-        } else if (tipoLower.contains("buffer") || tipoLower.contains("intermedio")) {
-            return Pedido.PrioridadPedido.MEDIA; // Búfer tienen prioridad media
-        } else if (tipoLower.contains("pasiva") || tipoLower.contains("provision pasiva")) {
-            return Pedido.PrioridadPedido.BAJA; // Proveedores pasivos tienen la menor prioridad
-        } else if (tipoLower.contains("solicitud")) {
-            return Pedido.PrioridadPedido.NO_APLICA; // Si es de tipo solicitud no tiene prioridad porque no realiza pedidos.
-        } else {
-            return Pedido.PrioridadPedido.MEDIA; // Por defecto, prioridad media
-        }
-    }
-
-
 
     private CofreLogistico crearCofreSegunTipo(String id, Punto posicion, int capacidad,
                                                String comportamientoPorDefecto,
@@ -740,56 +691,9 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             return cofre;
         }
 
-        /**
-         * Crea un cofre logístico con comportamientos específicos por item
-         *
-         * @param id El identificador único del cofre
-         * @param posicion La posición del cofre en la grilla
-         * @param capacidad La capacidad máxima del cofre
-         * @param tipoComportamientoDefecto El tipo de comportamiento por defecto
-         * @param comportamientosPorItem Mapa de comportamientos específicos por item
-         * @return El cofre logístico configurado
-         */
-        public static CofreLogistico crearCofreConComportamientos(
-                String id,
-                Punto posicion,
-                int capacidad,
-                String tipoComportamientoDefecto,
-                Map<String, String> comportamientosPorItem) {
-
-            CofreLogistico cofre = crearCofre(id, posicion, capacidad, tipoComportamientoDefecto);
-
-            // Configurar comportamientos específicos por item
-            if (comportamientosPorItem != null && !comportamientosPorItem.isEmpty()) {
-                for (Map.Entry<String, String> entry : comportamientosPorItem.entrySet()) {
-                    String nombreItem = entry.getKey();
-                    String tipoComportamiento = entry.getValue();
-
-                    Item item = new Item(nombreItem, nombreItem); // Asumiendo constructor simple
-                    ComportamientoCofre comportamiento = ComportamientoFactory.crearConParametros(
-                            tipoComportamiento,
-                            capacidad
-                    );
-                    cofre.setComportamiento(item, comportamiento);
-                }
-            }
-
-            return cofre;
-        }
     }
 
     private static class ComportamientoFactory {
-
-        /**
-         * Crea una instancia de comportamiento según el tipo especificado con parámetros por defecto
-         *
-         * @param tipo El tipo de comportamiento a crear
-         * @return La instancia del comportamiento correspondiente
-         * @throws IllegalArgumentException Si el tipo no es reconocido
-         */
-        public static ComportamientoCofre crear(String tipo) {
-            return crearConParametros(tipo, 100); // Capacidad por defecto
-        }
 
         /**
          * Crea una instancia de comportamiento según el tipo especificado con parámetros personalizados

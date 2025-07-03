@@ -22,8 +22,8 @@ class LogisticaRobotsConfigLoaderTest {
             // Assert
             assertNotNull(config, "La configuración no debería ser null");
             assertNotNull(config.dimensionGrilla(), "La dimensión de la grilla no debería ser null");
-            assertEquals(10, config.dimensionGrilla().ancho(), "El ancho de la grilla debería ser 10");
-            assertEquals(10, config.dimensionGrilla().alto(), "El alto de la grilla debería ser 10");
+            assertEquals(30, config.dimensionGrilla().ancho(), "El ancho de la grilla debería ser 10");
+            assertEquals(30, config.dimensionGrilla().alto(), "El alto de la grilla debería ser 10");
             
             // Verificar que se cargaron los robopuertos
             assertNotNull(config.robopuertos(), "La lista de robopuertos no debería ser null");

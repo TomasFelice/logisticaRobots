@@ -31,7 +31,7 @@ import java.util.Objects;
 public class LogisticaRobotsConfigLoader {
 
     private static final Logger logger = LoggerFactory.getLogger(LogisticaRobotsConfigLoader.class);
-    private static final String CONFIG_FILE_PATH = "/config/redConectadaCompletaCumplible.json";
+    private static final String CONFIG_FILE_PATH = "/config/redConectadaCompletaCumplibleSimple.json";
 
     private ConfiguracionSimulacionDTO configuracion;
     private final ObjectMapper objectMapper;
